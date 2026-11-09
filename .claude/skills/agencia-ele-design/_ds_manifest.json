@@ -1,0 +1,100 @@
+{
+  "namespace": "DS_design_system",
+  "components": [
+    {
+      "name": "SectionTab",
+      "sourcePath": "components/page/SectionTab.jsx",
+      "source_clusters": [
+        "CL-026",
+        "CL-027",
+        "CL-036",
+        "CL-037"
+      ]
+    },
+    {
+      "name": "RunningFooter",
+      "sourcePath": "components/page/RunningFooter.jsx",
+      "source_clusters": [
+        "CL-013",
+        "CL-016",
+        "CL-017"
+      ]
+    },
+    {
+      "name": "UnitTitleBar",
+      "sourcePath": "components/page/UnitTitleBar.jsx",
+      "source_clusters": [
+        "CL-055"
+      ]
+    },
+    {
+      "name": "ExerciseHeading",
+      "sourcePath": "components/exercise/ExerciseHeading.jsx",
+      "source_clusters": [
+        "CL-041"
+      ]
+    },
+    {
+      "name": "NumberTag",
+      "sourcePath": "components/exercise/NumberTag.jsx",
+      "source_clusters": [
+        "CL-019"
+      ]
+    },
+    {
+      "name": "AudioIcon",
+      "sourcePath": "components/exercise/AudioIcon.jsx",
+      "source_clusters": [
+        "CL-023",
+        "CL-021",
+        "CL-022",
+        "CL-024"
+      ]
+    },
+    {
+      "name": "AnswerLine",
+      "sourcePath": "components/exercise/AnswerLine.jsx",
+      "source_clusters": [
+        "CL-034"
+      ]
+    },
+    {
+      "name": "Bubble",
+      "sourcePath": "components/callouts/Bubble.jsx",
+      "source_clusters": [
+        "CL-051",
+        "CL-052",
+        "CL-057",
+        "CL-058"
+      ]
+    },
+    {
+      "name": "NotebookCard",
+      "sourcePath": "components/callouts/NotebookCard.jsx",
+      "source_clusters": [
+        "CL-039",
+        "CL-040"
+      ]
+    },
+    {
+      "name": "StickyNote",
+      "sourcePath": "components/callouts/StickyNote.jsx"
+    },
+    {
+      "name": "WordBox",
+      "sourcePath": "components/callouts/WordBox.jsx"
+    },
+    {
+      "name": "GrammarBox",
+      "sourcePath": "components/callouts/GrammarBox.jsx"
+    },
+    {
+      "name": "GrammarTable",
+      "sourcePath": "components/tables/GrammarTable.jsx",
+      "source_clusters": [
+        "CL-008",
+        "CL-009"
+      ]
+    }
+  ]
+}

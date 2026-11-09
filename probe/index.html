@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sonda SMART Board GX / SMART Board GX probe</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="../design-system/styles.css">
+  <link rel="stylesheet" href="probe.css">
+</head>
+<body class="probe">
+
+  <!-- P0 Shell: title tag, host / clock / evidence chips, Export / Copy / Reset -->
+  <header class="probe-head">
+    <div class="ds-titlebar acc-teal">
+      <h1 class="ds-titletag">Sonda SMART Board GX</h1>
+    </div>
+    <div class="probe-head__row">
+      <p class="probe-head__sub">
+        <span class="ds-bi">
+          <span class="ds-bi__es" lang="es">Instrumento de campo</span>
+          <span class="ds-bi__en" lang="en">Field instrument</span>
+        </span>
+      </p>
+      <div class="probe-chips" id="head-chips" role="status" aria-live="off"></div>
+      <div class="probe-actions">
+        <button type="button" class="ds-btn ds-btn--board" id="btn-export">
+          <span class="ic ic-download ic--md" aria-hidden="true"></span>
+          <span class="ds-bi ds-bi--on-dark">
+            <span class="ds-bi__es" lang="es">Exportar JSON</span>
+            <span class="ds-bi__en" lang="en">Export JSON</span>
+          </span>
+        </button>
+        <button type="button" class="ds-btn ds-btn--board ds-btn--secondary" id="btn-copy-log">
+          <span class="ic ic-clipboard-list ic--md" aria-hidden="true"></span>
+          <span class="ds-bi">
+            <span class="ds-bi__es" lang="es">Copiar registro</span>
+            <span class="ds-bi__en" lang="en">Copy log</span>
+          </span>
+        </button>
+        <button type="button" class="ds-btn ds-btn--board ds-btn--ghost" id="btn-reset">
+          <span class="ic ic-undo-2 ic--md" aria-hidden="true"></span>
+          <span class="ds-bi">
+            <span class="ds-bi__es" lang="es">Reiniciar</span>
+            <span class="ds-bi__en" lang="en">Reset</span>
+          </span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- P5 Restore banner (shown when a previous visit was found in localStorage) -->
+  <div id="restore-banner" hidden></div>
+
+  <!-- P1 Script rail + P2 Scenario list + P3 Work pane -->
+  <main class="probe-main">
+    <aside class="probe-rail" id="script-rail" aria-label="Guion del operador / Operator script"></aside>
+    <nav class="probe-list" id="scenario-list" aria-label="Escenarios / Scenarios"></nav>
+    <section class="probe-pane" id="work-pane" aria-label="Escenario activo / Active scenario"></section>
+  </main>
+
+  <!-- P4 Live log -->
+  <footer class="probe-log" id="live-log" data-open="false"></footer>
+
+  <!-- Skip sheet, completeness gate (P6) and reset confirm render here -->
+  <div id="modal-root"></div>
+
+  <!-- Reads the dynamic viewport height for the F keyboard check; never visible -->
+  <div class="probe-dvh" id="dvh-probe" aria-hidden="true"></div>
+
+  <script src="probe-core.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

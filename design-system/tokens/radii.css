@@ -1,0 +1,10 @@
+/* ELE radii converted pt -> px (x1.333): note card 3pt=4px, photo 5pt=6.67px, word box 12pt=16px, bubble 17pt=22.67px. */
+:root {
+  --r-square: 0;
+  --r-note: 4px;
+  --r-photo: 6.67px;
+  --r-card: 8px;      /* addition: Classroom-style card */
+  --r-dock: 16px;     /* ELE word-box */
+  --r-bubble: 22.67px;
+  --r-pill: 999px;
+}

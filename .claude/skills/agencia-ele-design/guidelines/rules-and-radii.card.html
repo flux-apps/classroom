@@ -1,0 +1,29 @@
+<!-- @dsCard group="Borders" viewport="700x190" name="Rules and radii" subtitle="stroke weights and corner radii as observed" -->
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  html,body{margin:0;background:var(--color-paper)}
+  body{padding:12px 16px;box-sizing:border-box;color:var(--color-ink);font-family:var(--text-small-2-myriadpro-400-family);font-size:11px}
+  .row{display:flex;flex-wrap:wrap;gap:10px}
+  .sw{width:78px} .sw i{display:block;height:44px;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(35,31,32,.15)}
+  .sw b{display:block;margin-top:3px;font-size:10.5px} .sw span{color:var(--color-slate);font-size:9.5px}
+  h4{margin:0 0 6px;font-size:11px;color:var(--color-slate);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+</style></head><body>
+<h4>Rules (observed stroke widths) and radii (estimated)</h4>
+<div style="display:grid;grid-template-columns:auto 1fr;gap:3px 12px;align-items:center;font-size:10px">
+ <span>0.25pt</span><i style="display:block;border-top:var(--border-rule-0-25) solid var(--color-ink)"></i>
+ <span>0.5pt</span><i style="display:block;border-top:var(--border-rule-0-5) solid var(--color-ink)"></i>
+ <span>1pt</span><i style="display:block;border-top:var(--border-rule-1) solid var(--color-ink)"></i>
+ <span>1.25pt</span><i style="display:block;border-top:var(--border-rule-1-25) solid var(--color-ink)"></i>
+ <span>2pt</span><i style="display:block;border-top:var(--border-rule-2) solid var(--color-ink)"></i>
+</div>
+<div class="row" style="margin-top:12px;align-items:flex-end">
+ <div class="sw"><i style="height:36px;background:var(--color-teal-tint);border-radius:var(--radius-3)"></i><b>3pt</b><span>note card</span></div>
+ <div class="sw"><i style="height:36px;background:var(--color-teal-tint);border-radius:var(--radius-5)"></i><b>5pt</b><span>photo frame</span></div>
+ <div class="sw"><i style="height:36px;background:var(--color-teal-tint);border-radius:var(--radius-12)"></i><b>12pt</b><span>word box</span></div>
+ <div class="sw"><i style="height:36px;background:var(--color-teal-tint);border-radius:var(--radius-17)"></i><b>17pt</b><span>p.2 shape</span></div>
+ <div class="sw"><i style="height:36px;width:36px;background:var(--color-teal-tint);border-radius:50%"></i><b>circle</b><span>bubbles (42.5pt+)</span></div>
+</div>
+</body></html>

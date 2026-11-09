@@ -1,0 +1,6 @@
+/* Webfonts copied into assets/fonts (latin subset: covers Spanish ñ á é í ó ú ü ¿ ¡). Substitutes for the ELE book's Officina Sans / hand faces. */
+@font-face { font-family: 'Fira Sans'; font-style: italic; font-weight: 400; font-display: swap; src: url('../assets/fonts/FiraSans-400-italic.woff2') format('woff2'); }
+@font-face { font-family: 'Fira Sans'; font-style: normal; font-weight: 400; font-display: swap; src: url('../assets/fonts/FiraSans-400.woff2') format('woff2'); }
+@font-face { font-family: 'Fira Sans'; font-style: normal; font-weight: 500; font-display: swap; src: url('../assets/fonts/FiraSans-500.woff2') format('woff2'); }
+@font-face { font-family: 'Fira Sans'; font-style: normal; font-weight: 700; font-display: swap; src: url('../assets/fonts/FiraSans-700.woff2') format('woff2'); }
+@font-face { font-family: 'Patrick Hand'; font-style: normal; font-weight: 400; font-display: swap; src: url('../assets/fonts/PatrickHand-400.woff2') format('woff2'); }

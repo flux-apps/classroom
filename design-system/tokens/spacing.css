@@ -1,0 +1,29 @@
+/* 4px base. Touch targets come from the infinite-canvas UX spec: tools >= 56px, 64px at 1280-1599, 72px at >= 1600. */
+:root {
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --hit-min: 56px;
+  --hit-board: 64px;
+  --hit-board-lg: 72px;
+  --hit-desktop: 40px;   /* laptop/prep surfaces (course hub) */
+
+  --rule-hair: 1px;      /* ELE hairline 0.5pt at screen weight */
+  --rule-1: 1.33px;      /* ELE 1pt */
+  --rule-2: 2.67px;      /* ELE 2pt */
+  --rule-tab: 4px;       /* left accent on the tilted title tag (ELE 3pt ≈ 4px) */
+
+  --grid-dot: 24px;      /* board dot-grid pitch */
+  --baseline: 24px;      /* ruled notebook line pitch (= body line-height) */
+
+  --sidebar-w: 264px;
+  --stream-w: 720px;
+}
+@media (min-width: 1280px) { :root { --hit-board: 64px; } }
+@media (min-width: 1600px) { :root { --hit-board: var(--hit-board-lg); } }

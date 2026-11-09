@@ -1,0 +1,28 @@
+<!-- @dsCard group="Page" viewport="700x150" name="UnitTitleBar" subtitle="Unit title bar, teal and orange" -->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { margin: 0; background: var(--color-paper); }
+  body { padding: 14px 16px; color: var(--color-ink); font-family: var(--text-body-family); box-sizing: border-box; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+  DS.mount('#root', { UnitTitleBar: './UnitTitleBar.jsx' }, (c) => (
+    <div style={{display:'grid',gap:'20pt',width:'482pt'}}>
+      <c.UnitTitleBar number={5} color="var(--color-teal-5)">¡Fiesta!</c.UnitTitleBar>
+      <c.UnitTitleBar number={5} color="var(--color-orange)">Gramática</c.UnitTitleBar>
+    </div>
+  ));
+</script>
+</body>
+</html>

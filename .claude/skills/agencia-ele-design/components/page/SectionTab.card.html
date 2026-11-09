@@ -1,0 +1,30 @@
+<!-- @dsCard group="Page" viewport="700x230" name="SectionTab" subtitle="Section side tab, left and right, per-section colour" -->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { margin: 0; background: var(--color-paper); }
+  body { padding: 14px 16px; color: var(--color-ink); font-family: var(--text-body-family); box-sizing: border-box; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+  DS.mount('#root', { SectionTab: './SectionTab.jsx' }, (c) => (
+    <div style={{display:'flex',gap:'24pt',alignItems:'flex-start'}}>
+      <c.SectionTab side="left" color="var(--color-lime)">Entre líneas</c.SectionTab>
+      <c.SectionTab side="left" color="var(--color-magenta-3)">Agencia ELE</c.SectionTab>
+      <c.SectionTab side="right" color="var(--color-steel-blue)">Línea a línea</c.SectionTab>
+      <c.SectionTab side="right" color="var(--color-orange)">Línea directa</c.SectionTab>
+    </div>
+  ));
+</script>
+</body>
+</html>

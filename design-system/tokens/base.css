@@ -1,0 +1,46 @@
+/* Element defaults + text roles + the signature touches as utility classes. */
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--text-body);
+  background: var(--surface-page);
+  -webkit-font-smoothing: antialiased;
+}
+:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+
+.t-display { font-size: var(--fs-display); line-height: var(--lh-display); font-weight: var(--fw-bold); margin: 0; }
+.t-h1 { font-size: var(--fs-h1); line-height: var(--lh-h1); font-weight: var(--fw-bold); margin: 0; }
+.t-h2 { font-size: var(--fs-h2); line-height: var(--lh-h2); font-weight: var(--fw-bold); margin: 0; }
+.t-h3 { font-size: var(--fs-h3); line-height: var(--lh-h3); font-weight: var(--fw-bold); margin: 0; }
+.t-body { font-size: var(--fs-body); line-height: var(--lh-body); margin: 0; }
+.t-small { font-size: var(--fs-small); line-height: var(--lh-small); margin: 0; }
+.t-caption { font-size: var(--fs-caption); line-height: var(--lh-caption); letter-spacing: var(--tracking-label); text-transform: uppercase; font-weight: var(--fw-medium); color: var(--text-muted); margin: 0; }
+.t-hand { font-family: var(--font-hand); font-size: var(--fs-hand); line-height: var(--lh-hand); margin: 0; }
+.t-example { color: var(--text-example); font-style: italic; }
+.t-muted { color: var(--text-muted); }
+
+/* accent scope: set --accent on any container (or use a .acc-* class) */
+.acc-lime { --accent: var(--accent-lime); }
+.acc-green { --accent: var(--accent-green); }
+.acc-orange { --accent: var(--accent-orange); }
+.acc-magenta { --accent: var(--accent-magenta); }
+.acc-blue { --accent: var(--accent-blue); }
+.acc-purple { --accent: var(--accent-purple); }
+.acc-teal { --accent: var(--accent-teal); }
+[class*="acc-"] { --accent-tint: color-mix(in srgb, var(--accent) 14%, white); }
+
+/* signature: chalk underline (wavy, accent) */
+.chalk { text-decoration: underline wavy var(--accent, var(--action)); text-decoration-thickness: 2px; text-underline-offset: 6px; }
+
+/* signature: notebook plane + board dot grid */
+.surface-board { background-color: var(--surface-board); background-image: var(--board-dots); background-size: var(--grid-dot) var(--grid-dot); }
+.surface-notebook { background-color: var(--color-paper); background-image: var(--notebook-lines); }
+
+/* giant lowercase number/word as a page header, cropped by its box (Behance: oversized unit numerals) */
+.t-giant { font: var(--fw-bold) 160px/0.8 var(--font-sans); text-transform: lowercase; color: var(--accent, var(--action)); letter-spacing: -0.04em; margin: 0; }
+/* paper cut-out blob behind hero areas and empty states */
+.ds-cutout { background: var(--accent-tint, var(--surface-sunken)); border-radius: 58% 42% 55% 45% / 48% 56% 44% 52%; }

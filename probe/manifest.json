@@ -1,0 +1,21 @@
+{
+  "name": "Sonda SMART Board GX / SMART Board GX probe",
+  "short_name": "GX probe",
+  "description": "Instrumento de campo / Field instrument",
+  "lang": "es",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F4EF",
+  "theme_color": "#2F5C93",
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "com.smarttech.iq"
+    },
+    {
+      "platform": "play",
+      "id": "com.smarttech.iq.launcher"
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+<!-- @dsCard group="Components" viewport="700x300" name="Navigation" -->
+<!doctype html><html lang="es"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)} .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px} .stack{display:flex;flex-direction:column;gap:12px;margin-bottom:16px} .frame{position:relative;height:260px;background:var(--surface-board);margin-bottom:16px}.board{background-color:var(--surface-board);background-image:var(--board-dots);background-size:24px 24px;padding:24px;border-radius:8px}</style>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+DS.mount('#root', {"Tabs":"./Tabs.jsx","NavItem":"./NavItem.jsx"}, (c) => { const {Tabs, NavItem} = c; return (<div>
+
+<Tabs tabs={[{id:'a',label:'Tablón'},{id:'b',label:'Trabajo de clase'},{id:'c',label:'Personas'}]} value="b" onChange={()=>{}} accent="green"/>
+<div className="stack" style={{width:264,marginTop:20}}><NavItem icon="house" label="Inicio" current accent="blue"/><NavItem icon="calendar" label="Calendario"/><NavItem icon="graduation-cap" label="Cursos"/></div>
+</div>); });
+</script></body></html>

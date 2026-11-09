@@ -1,0 +1,26 @@
+<!-- @dsCard group="Imagery" viewport="700x230" name="Imagery, notes and bullets" subtitle="photo frame, number tag, note card, bullet semantics (inferred)" -->
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../styles.css">
+<style>
+  html,body{margin:0;background:var(--color-paper)}
+  body{padding:12px 16px;box-sizing:border-box;color:var(--color-ink);font-family:var(--text-small-2-myriadpro-400-family);font-size:11px}
+  .row{display:flex;flex-wrap:wrap;gap:10px}
+  .sw{width:78px} .sw i{display:block;height:44px;border-radius:3px;box-shadow:inset 0 0 0 1px rgba(35,31,32,.15)}
+  .sw b{display:block;margin-top:3px;font-size:10.5px} .sw span{color:var(--color-slate);font-size:9.5px}
+  h4{margin:0 0 6px;font-size:11px;color:var(--color-slate);font-weight:600;letter-spacing:.04em;text-transform:uppercase}
+</style></head><body>
+<h4>Imagery treatment (U-008), note card (U-007), bullets (U-006, low confidence). No photos are shipped.</h4>
+<div style="display:flex;gap:22px;align-items:flex-start">
+ <div style="position:relative;width:150px;height:100px;flex:none;border:var(--photo-frame-width) solid var(--color-paper);border-radius:var(--photo-frame-radius);box-shadow:var(--shadow-soft);background:repeating-linear-gradient(45deg,var(--color-teal-3) 0 8px,var(--color-teal-tint) 8px 16px)">
+  <span style="position:absolute;right:-6px;bottom:-8px;width:19px;height:19px;border-radius:50%;background:#fff;box-shadow:0 0 0 1.7px var(--color-lime),var(--shadow-soft);display:grid;place-items:center;font:700 11px var(--text-heading-orange-family)">1</span>
+ </div>
+ <div style="width:170px;padding:9px 12px;background:var(--color-yellow-3);border-radius:var(--note-card-radius);transform:rotate(var(--note-card-tilt));box-shadow:var(--shadow-soft);font:14px/1.15 var(--text-note-hand-magenta-family)">Lo pasé de maravilla en la boda de mi prima.</div>
+ <div style="font:10.5pt/15pt var(--text-body-family)">
+  <div><span style="color:var(--bullet-example)">&#9679;</span>&nbsp;<i style="color:var(--role-example-text)">example sentence</i></div>
+  <div><span style="color:var(--bullet-reply)">&#9632;</span>&nbsp;<i style="color:var(--role-example-text)">reply option</i></div>
+  <div style="color:var(--color-slate);font-size:9.5px;margin-top:6px;max-width:150px">Photos: 3pt white frame, 5pt radius, soft shadow, numbered tag lower-right. Crops stay in _analysis/.</div>
+ </div>
+</div>
+</body></html>

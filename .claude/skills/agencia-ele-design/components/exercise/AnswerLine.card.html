@@ -1,0 +1,28 @@
+<!-- @dsCard group="Exercise" viewport="700x90" name="AnswerLine" subtitle="Answer blank, solid and dotted" -->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { margin: 0; background: var(--color-paper); }
+  body { padding: 14px 16px; color: var(--color-ink); font-family: var(--text-body-family); box-sizing: border-box; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+  DS.mount('#root', { AnswerLine: './AnswerLine.jsx' }, (c) => (
+    <div style={{display:'grid',gap:'10pt',font:'var(--text-body-size)/var(--text-body-line-height) var(--text-body-family)'}}>
+      <div>Vicente: <c.AnswerLine width="112pt" /></div>
+      <div>El número de enlaces matrimoniales en España <c.AnswerLine width="112pt" variant="dotted" />.</div>
+    </div>
+  ));
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+<!-- @dsCard group="Tables" viewport="700x170" name="GrammarTable" subtitle="Grammar paradigm table" -->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { margin: 0; background: var(--color-paper); }
+  body { padding: 14px 16px; color: var(--color-ink); font-family: var(--text-body-family); box-sizing: border-box; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+  DS.mount('#root', { GrammarTable: './GrammarTable.jsx' }, (c) => (
+    <c.GrammarTable accent="var(--color-grass-green)" columns={['hablar','comer','vivir']} rows={[
+      [<span>habl<b>ara</b>/habl<b>ase</b></span>, <span>com<b>iera</b>/com<b>iese</b></span>, <span>viv<b>iera</b>/viv<b>iese</b></span>],
+      [<span>habl<b>aras</b>/habl<b>ases</b></span>, <span>com<b>ieras</b>/com<b>ieses</b></span>, <span>viv<b>ieras</b>/viv<b>ieses</b></span>],
+      [<span>habl<b>ara</b>/habl<b>ase</b></span>, <span>com<b>iera</b>/com<b>iese</b></span>, <span>viv<b>iera</b>/viv<b>iese</b></span>],
+    ]} />
+  ));
+</script>
+</body>
+</html>

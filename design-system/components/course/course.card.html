@@ -1,0 +1,15 @@
+<!-- @dsCard group="Components" viewport="700x560" name="Course" -->
+<!doctype html><html lang="es"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)} .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px} .stack{display:flex;flex-direction:column;gap:12px;margin-bottom:16px} .frame{position:relative;height:260px;background:var(--surface-board);margin-bottom:16px}.board{background-color:var(--surface-board);background-image:var(--board-dots);background-size:24px 24px;padding:24px;border-radius:8px}</style>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+DS.mount('#root', {"ProgressBar":"../feedback/ProgressBar.jsx","AddSlot":"./AddSlot.jsx","StatPanel":"./StatPanel.jsx","CourseBanner":"./CourseBanner.jsx","StreamPost":"./StreamPost.jsx","SectionAccordion":"./SectionAccordion.jsx","ActivityRow":"./ActivityRow.jsx"}, (c) => { const {AddSlot, StatPanel, ProgressBar, CourseBanner, StreamPost, SectionAccordion, ActivityRow} = c; return (<div>
+
+<div className="stack" style={{maxWidth:640}}><div className="row"><StatPanel label="Entregas" value="18/24" delta="3 hoy" progress={75} accent="green"/><StatPanel label="Tardías" value="2" delta="1 más" trend="down" accent="magenta"/></div><CourseBanner title="Español A2" meta="Grupo 3 · lunes y miércoles" accent="green"/>
+<StreamPost icon="clipboard-list" accent="orange" title="Nueva tarea: El pretérito indefinido" meta="Publicada por Mari · 9 nov" side="Vence vie"/>
+<SectionAccordion title="Unidad 5 · ¡Qué fiesta!" accent="green" right={<ProgressBar value={60} accent="green"/>}><ActivityRow icon="book-open" name="Lectura: Las fiestas" state="done" accent="green"/><ActivityRow icon="file-text" name="Ejercicio 3: pretérito indefinido" due="vie" state="todo" accent="green"/><ActivityRow icon="volume-2" name="Audio 19" due="ayer" state="late" accent="green"/></SectionAccordion><AddSlot accent="green">Añadir sección / Add section</AddSlot></div>
+</div>); });
+</script></body></html>

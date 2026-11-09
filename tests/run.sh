@@ -11,6 +11,11 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILL_DIR="$ROOT/.claude/skills/design-from-pdf"
 REQ="$SKILL_DIR/requirements.txt"
 cd "$ROOT"
+if command -v node >/dev/null 2>&1 && [ -f "$ROOT/tests/probe.test.js" ]; then
+  echo "Running Node feature tests..."
+  node --test "$ROOT"/tests/*.test.js || exit 1
+fi
+
 
 sha256() { sha256sum "$1" 2>/dev/null || shasum -a 256 "$1"; }
 

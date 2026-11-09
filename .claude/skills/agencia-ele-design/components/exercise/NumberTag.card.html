@@ -1,0 +1,27 @@
+<!-- @dsCard group="Exercise" viewport="700x80" name="NumberTag" subtitle="Photo and panel number tag" -->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { margin: 0; background: var(--color-paper); }
+  body { padding: 14px 16px; color: var(--color-ink); font-family: var(--text-body-family); box-sizing: border-box; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+  DS.mount('#root', { NumberTag: './NumberTag.jsx' }, (c) => (
+    <div style={{display:'flex',gap:'14pt',padding:'8pt',background:'var(--color-steel-blue)'}}>
+      <c.NumberTag n={1} /><c.NumberTag n={2} /><c.NumberTag n={3} />
+    </div>
+  ));
+</script>
+</body>
+</html>

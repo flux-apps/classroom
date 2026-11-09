@@ -1,0 +1,26 @@
+/* Fira Sans = substitute for the book's Officina Sans (humanist sans). Patrick Hand = substitute for its handwriting faces.
+   Sizes are px (screen product), 16px body; the board scale is for a standing teacher at ~1920x1080. */
+:root {
+  --font-sans: 'Fira Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-hand: 'Patrick Hand', 'Comic Sans MS', cursive;
+
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
+
+  /* scale (size / line-height) */
+  --fs-display: 44px;   --lh-display: 48px;
+  --fs-h1: 32px;        --lh-h1: 40px;
+  --fs-h2: 24px;        --lh-h2: 32px;
+  --fs-h3: 20px;        --lh-h3: 28px;
+  --fs-body: 16px;      --lh-body: 24px;
+  --fs-small: 14px;     --lh-small: 20px;
+  --fs-caption: 12px;   --lh-caption: 16px;
+  --fs-hand: 22px;      --lh-hand: 28px;
+
+  /* board: readable at arm's length, tool labels never under 18px */
+  --fs-board-label: 18px;  --lh-board-label: 24px;
+  --fs-board-title: 28px;  --lh-board-title: 36px;
+
+  --tracking-label: 0.04em;
+}

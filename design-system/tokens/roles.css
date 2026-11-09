@@ -1,0 +1,64 @@
+/* Semantic aliases. Components and screens use these, never base colors directly. */
+:root {
+  /* text */
+  --text-body: var(--color-ink);
+  --text-muted: var(--color-slate);
+  --text-subtle: var(--color-grey);
+  --text-on-accent: var(--color-paper);
+  --text-example: var(--color-example-blue);   /* ELE: learner's language, italic */
+
+  /* surfaces */
+  --surface-page: var(--color-paper);
+  --surface-board: var(--color-canvas);
+  --surface-card: var(--color-paper);
+  --surface-sunken: var(--color-canvas-deep);
+  --surface-scrim: var(--scrim);
+  --border-quiet: var(--color-line);
+  --border-strong: var(--color-line-strong);
+
+  /* actions */
+  --action: var(--color-steel-blue);
+  --action-hover: var(--color-navy);
+  --action-quiet: color-mix(in srgb, var(--color-steel-blue) 12%, white);
+  --select: var(--color-example-blue);         /* Miro-style selection frame & focus ring */
+  --focus-ring: 0 0 0 2px var(--color-paper), 0 0 0 5px var(--color-example-blue);   /* stacked ring (Moodle + Miro): visible on any fill, on a projector */
+
+  /* feedback */
+  --state-success: var(--color-grass-green);
+  --state-warning: var(--color-orange);
+  --state-error: var(--color-red);
+  --state-info: var(--color-example-blue);
+
+  /* section accents: one per section/course (side tab, headings, banners). Each travels with a shape (--mark-*) so colour is never the only signal. */
+  --accent-lime: var(--color-lime);
+  --accent-green: var(--color-grass-green);
+  --accent-orange: var(--color-orange);
+  --accent-magenta: var(--color-magenta);
+  --accent-blue: var(--color-steel-blue);
+  --accent-purple: var(--color-purple);
+  --accent-teal: var(--color-teal);
+
+  --mark-circle: circle(50% at 50% 50%);
+  --mark-square: inset(8% round 2px);
+  --mark-triangle: polygon(50% 6%, 96% 92%, 4% 92%);
+  --mark-diamond: polygon(50% 2%, 98% 50%, 50% 98%, 2% 50%);
+  --mark-hexagon: polygon(25% 6%, 75% 6%, 98% 50%, 75% 94%, 25% 94%, 2% 50%);
+  --mark-pentagon: polygon(50% 3%, 97% 38%, 79% 96%, 21% 96%, 3% 38%);
+  --mark-cross: polygon(35% 4%, 65% 4%, 65% 35%, 96% 35%, 96% 65%, 65% 65%, 65% 96%, 35% 96%, 35% 65%, 4% 65%, 4% 35%, 35% 35%);
+
+  /* sticky-note fills (Miro stickies in ELE tints) */
+  --sticky-yellow: var(--color-yellow-pale);
+  --sticky-green: var(--color-green-tint);
+  --sticky-teal: var(--color-teal-tint);
+  --sticky-pink: var(--color-red-tint);
+  --sticky-lavender: color-mix(in srgb, var(--color-lavender) 55%, white);
+  --sticky-edge: color-mix(in srgb, var(--color-ink) 14%, transparent);   /* Miro: 1px darker same-hue edge */
+  --select-tile: color-mix(in srgb, var(--color-example-blue) 12%, white);   /* Miro: selected tool = tinted tile */
+
+  /* signature touches */
+  --tilt-tag: -3deg;        /* ELE title tag */
+  --tilt-note: -3deg;       /* ELE note card */
+  --tab-clip: polygon(0 0, 100% 0, 100% 94%, 0 100%);   /* ELE side tab: bottom edge slightly slanted */
+  --board-dots: radial-gradient(circle, var(--color-line-strong) 1.2px, transparent 1.6px);
+  --notebook-lines: repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--baseline) - 1px), var(--color-lavender) calc(var(--baseline) - 1px), var(--color-lavender) var(--baseline));
+}

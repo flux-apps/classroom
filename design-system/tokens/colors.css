@@ -1,0 +1,43 @@
+/* Base palette. ELE-sourced values are copied from agencia-ele-design/tokens/colors.css (hex unchanged).
+   Neutrals marked "addition" have no counterpart in the book (it is ink on white paper) and are listed in readme.md. */
+:root {
+  /* ink & paper (ELE) */
+  --color-ink: #231F20;
+  --color-paper: #FFFFFF;
+  --color-slate: #6D6E71;
+  --color-grey: #808285;
+
+  /* structure & language (ELE) */
+  --color-steel-blue: #2F5C93;
+  --color-navy: #003C60;
+  --color-example-blue: #0072BC;
+
+  /* section accents (ELE: the seven side-tab colours) */
+  --color-lime: #8DC63F;
+  --color-grass-green: #188943;
+  --color-orange: #D96629;
+  --color-magenta: #C02B5A;
+  --color-purple: #8E278F;
+  --color-teal: #0098B3;
+  --color-yellow: #F8C703;
+
+  /* feedback (ELE) */
+  --color-red: #D2232A;
+  --color-red-dark: #BA1F34;
+
+  /* tints (ELE) */
+  --color-teal-tint: #D6EEEA;
+  --color-green-tint: #EBF4DE;
+  --color-red-tint: #F0CFD0;
+  --color-yellow-pale: #FFF9B8;
+  --color-yellow-soft: #FBE091;
+  --color-lavender: #B8BDD4;
+  --color-blue-grey: #A4C8D3;
+
+  /* neutrals (addition): warm paper for the board plane and quiet UI lines */
+  --color-canvas: #F6F4EF;
+  --color-canvas-deep: #ECE9E1;
+  --color-line: #DDD9CE;
+  --color-line-strong: #BDB8AA;
+  --color-ink-2: #4A4547;
+}

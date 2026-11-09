@@ -1,0 +1,23 @@
+/* --shadow-soft derives from ELE's observed 0.35 shadow opacity (the book's real shadow is not measurable). */
+:root {
+  --shadow-soft: 0 1px 3px rgba(35, 31, 32, 0.35);
+  --shadow-note: 0 2px 4px rgba(35, 31, 32, 0.25);
+  --shadow-card: 0 1px 2px rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);   /* Classroom-style two-layer, tinted umbra */
+  --shadow-dock: 0 2px 4px rgba(26, 27, 30, 0.08), 0 6px 8px rgba(34, 36, 40, 0.08), 0 16px 16px rgba(60, 63, 73, 0.12);   /* Miro-style three layers: contact, mid, long */
+  --shadow-dialog: 0 2px 6px rgba(35, 31, 32, 0.3), 0 24px 56px rgba(35, 31, 32, 0.24);
+  --shadow-press: inset 0 2px 0 rgba(35, 31, 32, 0.2);
+
+  --scrim: rgba(35, 31, 32, 0.5);       /* ELE opacity 0.5 */
+  --glass: rgba(255, 255, 255, 0.75);   /* ELE opacity 0.75 */
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-std: cubic-bezier(0.4, 0, 0.2, 1);   /* Material standard */
+  --state-hover: 8%;   /* Classroom state layers: hover 8, focus/press 10 */
+  --state-press: 10%;
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 0ms; --dur-base: 0ms; --dur-slow: 0ms; }
+}

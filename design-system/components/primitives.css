@@ -1,0 +1,105 @@
+/* ---------- Button ---------- */
+.ds-btn {
+  --btn-h: var(--hit-desktop);
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: var(--btn-h); padding: 0 var(--space-4);
+  font: var(--fw-medium) var(--fs-body)/1 var(--font-sans);
+  border: var(--rule-1) solid transparent; border-radius: var(--r-card);
+  background: var(--action); color: var(--text-on-accent);
+  cursor: pointer; transition: background var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.ds-btn:hover { background: var(--action-hover); }
+.ds-btn:active { box-shadow: var(--shadow-press); transform: translateY(1px); }
+.ds-btn[disabled] { opacity: .45; cursor: not-allowed; box-shadow: none; transform: none; }
+.ds-btn--secondary { background: var(--surface-card); color: var(--action); border-color: var(--action); }
+.ds-btn--secondary:hover { background: var(--action-quiet); }
+.ds-btn--ghost { background: transparent; color: var(--action); }
+.ds-btn--ghost:hover { background: var(--action-quiet); }
+.ds-btn--danger { background: var(--state-error); }
+.ds-btn--danger:hover { background: var(--color-red-dark); }
+.ds-btn--accent { background: var(--accent, var(--action)); }
+.ds-btn--accent:hover { filter: brightness(.9); background: var(--accent, var(--action)); }
+.ds-btn--board { --btn-h: var(--hit-min); font-size: var(--fs-board-label); padding: 0 var(--space-5); border-radius: var(--r-dock); }
+.ds-btn--small { --btn-h: 32px; font-size: var(--fs-small); padding: 0 var(--space-3); }
+.ds-btn .ic { --icon-size: 1.25em; }
+
+/* ---------- IconButton ---------- */
+.ds-iconbtn {
+  --ib: var(--hit-desktop);
+  display: inline-grid; place-items: center; width: var(--ib); height: var(--ib); padding: 0;
+  border: 0; border-radius: var(--r-card); background: transparent; color: var(--text-body); cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.ds-iconbtn:hover { background: var(--surface-sunken); }
+.ds-iconbtn[aria-pressed="true"] { background: var(--action); color: var(--text-on-accent); }
+.ds-iconbtn[disabled] { opacity: .4; cursor: not-allowed; }
+.ds-iconbtn--board { --ib: var(--hit-board); border-radius: var(--r-dock); --icon-size: 32px; }
+
+/* ---------- Badge / Tag ---------- */
+.ds-badge {
+  display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px;
+  font: var(--fw-medium) var(--fs-caption)/1 var(--font-sans); letter-spacing: var(--tracking-label); text-transform: uppercase;
+  border-radius: var(--r-pill); background: var(--surface-sunken); color: var(--text-body);
+}
+.ds-badge--success { background: color-mix(in srgb, var(--state-success) 16%, white); color: var(--state-success); }
+.ds-badge--warning { background: color-mix(in srgb, var(--state-warning) 16%, white); color: #8a3d12; }
+.ds-badge--error { background: var(--color-red-tint); color: var(--color-red-dark); }
+.ds-badge--info { background: color-mix(in srgb, var(--state-info) 14%, white); color: var(--state-info); }
+.ds-badge--accent { background: var(--accent-tint, var(--action-quiet)); color: var(--accent, var(--action)); }
+
+.ds-tag--accent { background: var(--accent-tint); border-color: var(--accent); color: color-mix(in srgb, var(--accent) 70%, var(--color-ink)); }   /* Miro-style pale fill + saturated edge + dark text */
+.ds-tag {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 28px; padding: 0 var(--space-3);
+  font: var(--fs-small)/1 var(--font-sans); border: var(--rule-hair) solid var(--border-strong);
+  border-radius: var(--r-note); background: var(--surface-card); color: var(--text-body);
+}
+.ds-tag .ds-tag__x { border: 0; background: none; padding: 0; cursor: pointer; color: var(--text-muted); display: inline-grid; }
+
+/* ---------- Card ---------- */
+.ds-card { background: var(--surface-card); border-radius: var(--r-card); box-shadow: var(--shadow-card); padding: var(--space-5); }
+.ds-card--outline { box-shadow: none; border: var(--rule-hair) solid var(--border-quiet); }
+.ds-card--lined { background-color: var(--color-paper); background-image: var(--notebook-lines); border-radius: var(--r-note); box-shadow: var(--shadow-note); line-height: var(--baseline); }
+.ds-card--tinted { background: var(--accent-tint, var(--action-quiet)); box-shadow: none; border-radius: var(--r-dock); }
+.ds-card__title { font: var(--fw-bold) var(--fs-h3)/var(--lh-h3) var(--font-sans); color: var(--accent, var(--text-body)); margin: 0 0 var(--space-2); }
+
+/* ---------- Marker (accent shape: colour is never the only signal) ---------- */
+.ds-mark { display: inline-block; width: 16px; height: 16px; flex: none; background: var(--accent, var(--action)); }
+.ds-mark--circle { clip-path: var(--mark-circle); }
+.ds-mark--square { clip-path: var(--mark-square); }
+.ds-mark--triangle { clip-path: var(--mark-triangle); }
+.ds-mark--diamond { clip-path: var(--mark-diamond); }
+.ds-mark--hexagon { clip-path: var(--mark-hexagon); }
+.ds-mark--pentagon { clip-path: var(--mark-pentagon); }
+.ds-mark--cross { clip-path: var(--mark-cross); }
+.ds-mark--lg { width: 28px; height: 28px; }
+
+/* ---------- BilingualLabel (ES first, EN second, both always) ---------- */
+.ds-bi { display: inline-flex; flex-direction: column; line-height: 1.2; text-align: inherit; }
+.ds-bi__es { font-weight: var(--fw-medium); }
+.ds-bi__en { font-size: .78em; font-weight: var(--fw-regular); color: var(--text-muted); font-style: italic; }
+.ds-bi--inline { flex-direction: row; gap: .4em; align-items: baseline; }
+.ds-bi--on-dark .ds-bi__en { color: inherit; opacity: .8; }
+
+/* ---------- TitleTag (signature: tilted white tag on an accent bar, from the ELE unit title) ---------- */
+.ds-titlebar { position: relative; height: 28px; background: var(--accent, var(--action)); margin: var(--space-6) 0 var(--space-4); }
+.ds-titletag {
+  position: absolute; left: var(--space-6); top: -20px; padding: 4px 14px 6px;
+  background: var(--color-paper); border-left: var(--rule-tab) solid var(--accent, var(--action));
+  transform: rotate(var(--tilt-tag)); box-shadow: var(--shadow-soft);
+  font: var(--fw-bold) var(--fs-h2)/1.05 var(--font-sans); color: var(--accent, var(--action)); white-space: nowrap;
+}
+
+/* ---------- SectionTab (signature: clipped side tab, vertical text) ---------- */
+.ds-tab {
+  display: inline-flex; width: 52px; min-height: 152px; padding: 14px 0 0; justify-content: center;
+  background: var(--accent, var(--action)); color: var(--text-on-accent); clip-path: var(--tab-clip);
+  writing-mode: vertical-rl; font: var(--fw-bold) var(--fs-h3)/1 var(--font-sans); white-space: nowrap;
+}
+.ds-tab-wrap { display: inline-block; filter: drop-shadow(0 1px 2px rgba(35, 31, 32, .45)); }
+
+/* ---------- Icon ---------- */
+.ds-icon { vertical-align: middle; }
+
+/* lined card: keep text on the 24px rules */
+.ds-card--lined { padding: 0 var(--space-5); }
+.ds-card--lined .ds-card__title { font-size: var(--fs-h3); line-height: var(--baseline); margin: 0; }

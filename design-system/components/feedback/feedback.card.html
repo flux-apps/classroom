@@ -1,0 +1,16 @@
+<!-- @dsCard group="Components" viewport="700x520" name="Feedback" -->
+<!doctype html><html lang="es"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)} .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px} .stack{display:flex;flex-direction:column;gap:12px;margin-bottom:16px} .frame{position:relative;height:260px;background:var(--surface-board);margin-bottom:16px}.board{background-color:var(--surface-board);background-image:var(--board-dots);background-size:24px 24px;padding:24px;border-radius:8px}</style>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+DS.mount('#root', {"Button":"../primitives/Button.jsx","Dialog":"./Dialog.jsx","Toast":"./Toast.jsx","Tooltip":"./Tooltip.jsx","ProgressBar":"./ProgressBar.jsx","CompletionCheck":"./CompletionCheck.jsx"}, (c) => { const {Button, Dialog, Toast, Tooltip, ProgressBar, CompletionCheck} = c; return (<div>
+
+<div className="row"><Toast tone="success" icon="circle-check">Guardada / Saved</Toast><Toast tone="error" icon="triangle-alert">No se pudo abrir el PDF</Toast><Toast>Sin guardar</Toast></div>
+<div className="row"><ProgressBar value={60} accent="green"/><ProgressBar value={25} accent="orange" label="2 de 8"/></div>
+<div className="row">{['none','todo','done','late'].map(s=><CompletionCheck key={s} state={s} accent="green"/>)}{['todo','done','late'].map(s=><CompletionCheck key={s} labelled state={s} accent="green"/>)}<Tooltip text="Deshacer" open><span style={{padding:'0 8px'}}>↶</span></Tooltip></div>
+<div className="frame" style={{height:240}}><Dialog title="¿Borrar el tablero?" onClose={()=>{}} actions={<><Button variant="ghost">Cancelar</Button><Button variant="danger">Borrar</Button></>}>Se perderán los objetos y la tinta. / Objects and ink will be lost.</Dialog></div>
+</div>); });
+</script></body></html>

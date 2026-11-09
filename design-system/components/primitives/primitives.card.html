@@ -1,0 +1,18 @@
+<!-- @dsCard group="Components" viewport="700x500" name="Primitives" -->
+<!doctype html><html lang="es"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)} .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px} .stack{display:flex;flex-direction:column;gap:12px;margin-bottom:16px} .frame{position:relative;height:260px;background:var(--surface-board);margin-bottom:16px}.board{background-color:var(--surface-board);background-image:var(--board-dots);background-size:24px 24px;padding:24px;border-radius:8px}</style>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+DS.mount('#root', {"Button":"./Button.jsx","IconButton":"./IconButton.jsx","Badge":"./Badge.jsx","Tag":"./Tag.jsx","Card":"./Card.jsx","Marker":"./Marker.jsx","BilingualLabel":"./BilingualLabel.jsx","TitleTag":"./TitleTag.jsx","SectionTab":"./SectionTab.jsx","Icon":"./Icon.jsx"}, (c) => { const {Button, IconButton, Badge, Tag, Card, Marker, BilingualLabel, TitleTag, SectionTab, Icon} = c; return (<div>
+
+<div className="row"><Button icon="plus">Nueva tarea</Button><Button variant="secondary">Cancelar</Button><Button variant="ghost">Más tarde</Button><Button variant="danger" icon="trash-2">Borrar</Button><Button variant="accent" accent="orange">Gramática</Button><Button disabled>Desactivado</Button><Button size="small">Pequeño</Button><Button size="board" icon="save">Guardar</Button></div>
+<div className="row"><IconButton icon="settings" label="Ajustes"/><IconButton icon="pen" label="Lápiz" pressed/><IconButton icon="trash-2" label="Borrar" disabled/><IconButton size="board" icon="eraser" label="Goma"/></div>
+<div className="row"><Badge>Borrador</Badge><Badge tone="success">Entregada</Badge><Badge tone="warning">Vence hoy</Badge><Badge tone="error">Tarde</Badge><Badge tone="info">Nuevo</Badge><Badge accent="purple">Unidad 6</Badge><Tag onRemove={()=>{}}>Pretérito</Tag><Tag>A2</Tag></div>
+<div className="row">{['lime','green','orange','magenta','blue','purple','teal'].map(a=><Marker key={a} accent={a} large/>)}<BilingualLabel es="Guardar lección" en="Save lesson"/><BilingualLabel inline es="Tablero" en="Board"/></div>
+<div className="row"><Card variant="tinted" accent="orange" title="Gramática"><span className="t-example">Ayer <b>estuve</b> en una fiesta.</span></Card><Card variant="lined" title="Cuaderno">Hoy aprendemos el indefinido.</Card><SectionTab accent="green">Unidad 5</SectionTab></div>
+<TitleTag accent="green">¡Qué fiesta!</TitleTag>
+</div>); });
+</script></body></html>

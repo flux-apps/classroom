@@ -1,0 +1,30 @@
+<!-- @dsCard group="Callouts" viewport="700x240" name="Bubble" subtitle="Circular bubbles in four tints" -->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { margin: 0; background: var(--color-paper); }
+  body { padding: 14px 16px; color: var(--color-ink); font-family: var(--text-body-family); box-sizing: border-box; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+  DS.mount('#root', { Bubble: './Bubble.jsx' }, (c) => (
+    <div style={{display:'flex',gap:'18pt',alignItems:'center',background:'var(--color-teal-3)',padding:'12pt'}}>
+      <c.Bubble size="90pt" tint="sun">El aprendizaje como un proceso.</c.Bubble>
+      <c.Bubble size="130pt" tint="rose">Concede especial atención al conocimiento estratégico.</c.Bubble>
+      <c.Bubble size="130pt" tint="teal">Textos adicionales para mejorar la comprensión lectora.</c.Bubble>
+      <c.Bubble size="90pt" tint="lavender">El MCER nos habla de saber.</c.Bubble>
+    </div>
+  ));
+</script>
+</body>
+</html>

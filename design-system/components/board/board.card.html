@@ -1,0 +1,15 @@
+<!-- @dsCard group="Components" viewport="700x620" name="Board" -->
+<!doctype html><html lang="es"><head><meta charset="utf-8"><link rel="stylesheet" href="../../styles.css">
+<style>body{padding:20px;background:var(--surface-page)} .row{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px} .stack{display:flex;flex-direction:column;gap:12px;margin-bottom:16px} .frame{position:relative;height:260px;background:var(--surface-board);margin-bottom:16px}.board{background-color:var(--surface-board);background-image:var(--board-dots);background-size:24px 24px;padding:24px;border-radius:8px}</style>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script></head><body><div id="root"></div>
+<script type="text/babel">
+DS.mount('#root', {"Frame":"./Frame.jsx","ToolButton":"./ToolButton.jsx","ToolDock":"./ToolDock.jsx","ZoomControl":"./ZoomControl.jsx","StickyNote":"./StickyNote.jsx","ObjectCard":"./ObjectCard.jsx","OverlayChip":"./OverlayChip.jsx","NoticeBanner":"./NoticeBanner.jsx"}, (c) => { const {Frame, ToolButton, ToolDock, ZoomControl, StickyNote, ObjectCard, OverlayChip, NoticeBanner} = c; return (<div>
+
+<div className="stack"><NoticeBanner es="Este tablero pinta con el lápiz de la app, no con Overlay." en="This board draws with the in-app pen, not Overlay." actionLabel="Entendido / Got it"/></div>
+<div className="row"><ToolDock><ToolButton icon="mouse-pointer-2" label="Elegir"/><ToolButton icon="pen" label="Lápiz" pressed/><ToolButton icon="eraser" label="Goma"/><ToolButton icon="type" label="Texto"/><ToolDock.Sep/><ToolButton icon="undo-2" label="Deshacer"/><ToolButton icon="redo-2" label="Rehacer"/></ToolDock><ZoomControl value={100}/><OverlayChip state="unknown"/><OverlayChip state="on"/><OverlayChip state="off"/></div>
+<div className="board row" style={{alignItems:'flex-start',gap:28}}><ObjectCard kind="pdf" selected title="Agencia ELE.pdf" meta="48 pp · p.12" accent="green" tabLabel="Libro" actionLabel="Abrir libro / Open book"/><ObjectCard kind="link" title="Diccionario RAE" meta="dle.rae.es" accent="blue" actionLabel="Abrir en pestaña ↗"/><ObjectCard kind="pdf" failed title="Roto.pdf" meta="No se pudo abrir" accent="magenta" actionLabel="Reintentar"/><Frame title="1 · Calentamiento" width={300} height={150}/><StickyNote>¡Hoy: el pretérito indefinido!</StickyNote><StickyNote color="teal" accent="teal">Estuve · estuviste · estuvo</StickyNote></div>
+</div>); });
+</script></body></html>

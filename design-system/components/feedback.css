@@ -1,0 +1,45 @@
+/* ---------- Dialog ---------- */
+.ds-scrim { position: absolute; inset: 0; background: var(--surface-scrim); display: grid; place-items: center; padding: var(--space-5); }
+.ds-dialog { width: min(480px, 100%); background: var(--surface-card); border-radius: var(--r-dock); box-shadow: var(--shadow-dialog); overflow: hidden; }
+.ds-dialog__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); padding: var(--space-5) var(--space-5) 0; }
+.ds-dialog__title { margin: 0; font: var(--fw-bold) var(--fs-h2)/var(--lh-h2) var(--font-sans); }
+.ds-dialog__body { padding: var(--space-3) var(--space-5) var(--space-5); color: var(--text-body); }
+.ds-dialog__foot { display: flex; justify-content: flex-end; gap: var(--space-3); padding: var(--space-4) var(--space-5); background: var(--surface-sunken); }
+
+/* ---------- Toast ---------- */
+.ds-toast {
+  display: inline-flex; align-items: center; gap: var(--space-3); min-height: 48px; padding: var(--space-2) var(--space-4);
+  background: var(--color-ink); color: var(--color-paper); border-radius: var(--r-card); box-shadow: var(--shadow-dock);
+  border-left: var(--rule-tab) solid var(--toast-c, var(--color-paper)); font-size: var(--fs-small);
+}
+.ds-toast--success { --toast-c: var(--color-lime); }
+.ds-toast--error { --toast-c: var(--color-red); }
+.ds-toast--warning { --toast-c: var(--color-yellow); }
+.ds-toast--info { --toast-c: var(--color-teal); }
+
+/* ---------- Tooltip ---------- */
+.ds-tip { position: relative; display: inline-flex; }
+.ds-tip__bubble {
+  position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); white-space: nowrap; pointer-events: none;
+  padding: 6px 10px; border-radius: var(--r-note); background: var(--color-ink); color: var(--color-paper); font-size: var(--fs-small);
+  opacity: 0; transition: opacity var(--dur-fast) var(--ease-out);
+}
+.ds-tip:hover .ds-tip__bubble, .ds-tip:focus-within .ds-tip__bubble, .ds-tip--open .ds-tip__bubble { opacity: 1; }
+
+/* ---------- ProgressBar (Moodle completion progress) ---------- */
+.ds-progress { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-small); }
+.ds-progress__track { flex: 1; height: 8px; border-radius: var(--r-pill); background: var(--surface-sunken); overflow: hidden; min-width: 80px; }
+.ds-progress__fill { height: 100%; background: var(--accent, var(--action)); border-radius: var(--r-pill); transition: width var(--dur-slow) var(--ease-out); }
+
+/* ---------- CompletionCheck (Moodle activity completion; shape + icon, not colour alone) ---------- */
+.ds-done { cursor: default; font: inherit; width: 24px; height: 24px; flex: none; display: inline-grid; place-items: center; border-radius: var(--r-pill); border: var(--rule-2) dashed var(--border-strong); color: transparent; background: transparent; padding: 0; }
+.ds-done .ic { --icon-size: 14px; }
+.ds-done--done { border: 0; background: var(--state-success); color: var(--color-paper); }
+.ds-done--todo { border-style: solid; border-color: var(--accent, var(--action)); }
+.ds-done--late { border: 0; background: var(--state-error); color: var(--color-paper); }
+
+/* labelled completion: text + icon, never colour alone (Moodle "Mark as done" button) */
+.ds-donebtn { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 var(--space-3); border: var(--rule-1) solid var(--accent, var(--action)); border-radius: var(--r-pill); background: transparent; color: var(--accent, var(--action)); font: var(--fw-medium) var(--fs-small)/1 var(--font-sans); cursor: pointer; }
+.ds-donebtn--done { background: color-mix(in srgb, var(--state-success) 16%, white); border-color: color-mix(in srgb, var(--state-success) 45%, white); color: var(--state-success); }
+.ds-donebtn--late { background: var(--color-red-tint); border-color: var(--state-error); color: var(--color-red-dark); }
+.ds-donebtn--board { min-height: var(--hit-min); font-size: var(--fs-board-label); padding: 0 var(--space-5); }

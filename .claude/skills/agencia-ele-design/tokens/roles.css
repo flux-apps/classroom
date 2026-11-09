@@ -1,0 +1,35 @@
+/* Semantic aliases and inferred values. Hand-written (not generated): every token here has a provenance.json entry
+   with status "inferred" and an id from the approved analysis (U-001 ... U-008). Re-running scaffold leaves this file alone. */
+:root {
+  /* U-001 type scale: sizes from the observed text styles, caption fitted */
+  --type-scale-body: var(--text-body-size);
+  --type-scale-instruction: var(--text-instruction-size);
+  --type-scale-small: var(--text-small-size);
+  --type-scale-caption: 8pt;
+
+  /* U-002 example / model sentence role */
+  --role-example-text: var(--color-example-blue);
+  --role-example-style: italic;
+
+  /* U-004 section accents: the side tab and headings change colour per section */
+  --section-accent-lime: var(--color-lime);
+  --section-accent-grass-green: var(--color-grass-green);
+  --section-accent-orange: var(--color-orange);
+  --section-accent-magenta: var(--color-magenta-3);
+  --section-accent-steel-blue: var(--color-steel-blue);
+  --section-accent-purple: var(--color-magenta-5);
+  --section-accent-teal: var(--color-teal-5);
+
+  /* U-006 bullet semantics (low confidence: only evidenced on p.8) */
+  --bullet-example: var(--color-lime);
+  --bullet-reply: var(--color-orange);
+
+  /* U-007 handwritten note card: tilt and radius fitted, shadow not measurable so it reuses the observed 0.35 opacity */
+  --note-card-tilt: -3deg;
+  --note-card-radius: var(--radius-3);
+  --shadow-soft: 0 1pt 3pt rgba(35, 31, 32, var(--opacity-0-35));
+
+  /* U-008 photo treatment (photos themselves are not shipped) */
+  --photo-frame-width: 3pt;
+  --photo-frame-radius: var(--radius-5);
+}

@@ -1,0 +1,55 @@
+/* ---------- ToolDock (Miro-style floating dock; targets from the GX spec) ---------- */
+.ds-dock { display: inline-flex; align-items: center; gap: var(--space-1); padding: var(--space-2); background: var(--surface-card); border-radius: var(--r-dock); box-shadow: var(--shadow-dock); }
+.ds-dock__sep { width: var(--rule-hair); align-self: stretch; margin: 6px var(--space-1); background: var(--border-quiet); }
+.ds-tool {
+  min-width: var(--hit-board); height: calc(var(--hit-board) + 8px); padding: 0 10px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  border: 0; border-radius: var(--r-card); background: transparent; color: var(--text-body); cursor: pointer;
+  font: var(--fw-medium) 14px/1 var(--font-sans); --icon-size: 28px;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+.ds-tool:hover { background: var(--surface-sunken); }
+.ds-tool { position: relative; }
+.ds-tool[aria-pressed="true"] { background: var(--select-tile); color: var(--select); }
+.ds-tool[aria-pressed="true"]::after { content: ""; position: absolute; left: 14px; right: 14px; top: 3px; height: 4px; border-radius: 2px; background: var(--select); }   /* shape cue: selected is never colour alone */
+.ds-tool[disabled] { opacity: .4; cursor: not-allowed; }
+
+/* ---------- ZoomControl (always 72px at >=1600, works with Overlay on) ---------- */
+.ds-zoom { display: inline-flex; align-items: center; gap: var(--space-1); }
+.ds-zoom__value { min-width: 72px; height: var(--hit-board); border: 0; background: transparent; font: var(--fw-bold) var(--fs-board-label)/1 var(--font-sans); color: var(--text-body); cursor: text; border-radius: var(--r-card); }
+.ds-zoom__value:hover { background: var(--surface-sunken); }
+
+/* ---------- StickyNote (handwriting, tilted, washi tape) ---------- */
+.ds-sticky { position: relative; width: 200px; min-height: 200px; padding: 28px 18px 18px; background: var(--sticky-yellow); border-radius: var(--r-note); box-shadow: var(--shadow-note); border: 1px solid var(--sticky-edge); transform: rotate(var(--tilt-note)); font: var(--fs-hand)/var(--lh-hand) var(--font-hand); color: var(--color-ink); }
+.ds-sticky::before { content: ""; position: absolute; top: -10px; left: 50%; width: 72px; height: 22px; transform: translateX(-50%) rotate(2deg); background: color-mix(in srgb, var(--accent, var(--color-lavender)) 55%, white); opacity: .85; }
+.ds-sticky--green { background: var(--sticky-green); }
+.ds-sticky--teal { background: var(--sticky-teal); }
+.ds-sticky--pink { background: var(--sticky-pink); }
+.ds-sticky--lavender { background: var(--sticky-lavender); }
+.ds-sticky--flat { transform: none; }
+
+/* ---------- ObjectCard (PDF / image / link on the board; selection frame like Miro) ---------- */
+.ds-object { position: relative; width: 260px; background: var(--surface-card); border-radius: var(--r-card); box-shadow: var(--shadow-card); overflow: hidden; }
+.ds-object--selected { outline: var(--rule-2) solid var(--select); outline-offset: 3px; }
+.ds-object--selected::after { content: ""; position: absolute; right: -2px; bottom: -2px; width: 22px; height: 22px; background: var(--color-paper); border: 3px solid var(--select); border-radius: var(--r-pill); }   /* round handle: touch-friendly */
+.ds-object__thumb { aspect-ratio: 4 / 3; background: var(--accent-tint, var(--surface-sunken)); display: grid; place-items: center; color: var(--accent, var(--text-muted)); --icon-size: 48px; position: relative; }
+.ds-object__tab { position: absolute; top: 0; right: 12px; }
+.ds-object__tab .ds-tab { width: 28px; min-height: 64px; padding-top: 8px; font-size: 13px; }
+.ds-object__body { padding: var(--space-3) var(--space-4) var(--space-4); display: flex; flex-direction: column; gap: 2px; }
+.ds-object__title { font-weight: var(--fw-bold); }
+.ds-object__meta { font-size: var(--fs-small); color: var(--text-muted); }
+.ds-object__action { margin-top: var(--space-3); }
+.ds-object--failed .ds-object__thumb { background: var(--color-red-tint); color: var(--state-error); }
+
+/* ---------- OverlayChip & NoticeBanner (honor-system, never a gate) ---------- */
+.ds-chip { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 var(--space-4); border: var(--rule-1) solid var(--border-strong); border-radius: var(--r-pill); background: var(--surface-card); font: var(--fw-medium) var(--fs-small)/1 var(--font-sans); cursor: pointer; }
+.ds-chip--on { border-color: var(--state-warning); }
+.ds-chip--off { border-color: var(--state-success); }
+.ds-banner { display: flex; align-items: flex-start; gap: var(--space-4); padding: var(--space-4) var(--space-5); background: var(--color-yellow-pale); border-bottom: var(--rule-2) solid var(--color-yellow); font-size: var(--fs-board-label); line-height: var(--lh-board-label); }
+.ds-banner__text { flex: 1; display: flex; flex-direction: column; gap: var(--space-1); }
+.ds-banner__en { font-size: .88em; font-style: italic; color: var(--color-ink-2); }
+
+/* ---------- Frame (Miro frame: white sheet, title outside top-left) ---------- */
+.ds-frame { position: relative; margin-top: 32px; background: var(--color-paper); box-shadow: var(--shadow-card); border-radius: var(--r-note); min-height: 160px; }
+.ds-frame__title { position: absolute; left: 0; bottom: 100%; padding-bottom: 6px; font: var(--fw-medium) var(--fs-board-label)/1 var(--font-sans); color: var(--text-muted); }
+.ds-tool__en { font-size: 11px; font-style: italic; font-weight: var(--fw-regular); color: var(--text-muted); }
+.ds-tool[aria-pressed="true"] .ds-tool__en { color: inherit; }

@@ -1,0 +1,29 @@
+<!-- @dsCard group="Callouts" viewport="700x150" name="NotebookCard" subtitle="Ruled notebook card" -->
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../../styles.css">
+<style>
+  html, body { margin: 0; background: var(--color-paper); }
+  body { padding: 14px 16px; color: var(--color-ink); font-family: var(--text-body-family); box-sizing: border-box; }
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone@7.26.0/babel.min.js"></script>
+<script src="../../_ds_preview.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+  DS.mount('#root', { NotebookCard: './NotebookCard.jsx' }, (c) => (
+    <c.NotebookCard width="260pt">
+      <div>Vicente: <span style={{color:'var(--color-grey)'}}>__________</span></div>
+      <div>Alicia: <span style={{color:'var(--color-grey)'}}>__________</span></div>
+      <div>Pedro: <span style={{color:'var(--color-grey)'}}>__________</span></div>
+    </c.NotebookCard>
+  ));
+</script>
+</body>
+</html>

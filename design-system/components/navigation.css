@@ -1,0 +1,14 @@
+/* ---------- Tabs ---------- */
+.ds-tabs { display: flex; gap: var(--space-5); border-bottom: var(--rule-hair) solid var(--border-quiet); }
+.ds-tabs__tab {
+  min-height: 48px; padding: 0 var(--space-1); border: 0; background: none; cursor: pointer;
+  font: var(--fw-medium) var(--fs-body)/1 var(--font-sans); color: var(--text-muted);
+}
+.ds-tabs__tab:hover { color: var(--text-body); }
+.ds-tabs__tab[aria-selected="true"] { color: var(--accent, var(--action)); text-decoration: underline wavy var(--accent, var(--action)); text-decoration-thickness: 2px; text-underline-offset: 8px; }
+
+/* ---------- NavItem (sidebar row; active = chalk underline + accent mark) ---------- */
+.ds-nav { display: flex; align-items: center; gap: var(--space-3); width: 100%; min-height: 44px; padding: 0 var(--space-4); border: 0; background: none; text-align: left; cursor: pointer; font: var(--fw-medium) var(--fs-body)/1 var(--font-sans); color: var(--text-body); border-radius: 0 var(--r-pill) var(--r-pill) 0; }
+.ds-nav:hover { background: var(--surface-sunken); }
+.ds-nav[aria-current="page"] { background: var(--accent-tint, var(--action-quiet)); color: var(--accent, var(--action)); }
+.ds-nav[aria-current="page"] .ds-nav__label { text-decoration: underline wavy var(--accent, var(--action)); text-decoration-thickness: 2px; text-underline-offset: 6px; }

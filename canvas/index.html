@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Pizarra de lección / Lesson board</title>
+  <!-- Design system: relative link, works from file:// and from any static host that serves the repo root (design-system/ stays a sibling of canvas/). -->
+  <link rel="stylesheet" href="../design-system/styles.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="cv-body">
+<div class="cv-app" id="app" data-tool="pen">
+
+  <!-- C1 First-run Overlay weather notice (AC4): informational, never a gate -->
+  <section class="ds-banner cv-banner" id="c1-banner" role="region" aria-label="Aviso Overlay / Overlay notice">
+    <span class="ic ic-info cv-banner__icon" aria-hidden="true"></span>
+    <div class="ds-banner__text" id="c1-text">
+      <span class="cv-banner__title" lang="es">Aviso Overlay <span lang="en" class="ds-banner__en">Overlay notice</span></span>
+      <span class="cv-banner__copy" lang="es" data-bi="overlayBanner.text.es"></span>
+      <span class="cv-banner__copy ds-banner__en" lang="en" data-bi="overlayBanner.text.en"></span>
+    </div>
+    <button type="button" class="ds-iconbtn ds-iconbtn--board cv-banner__peek" id="btn-banner-toggle" aria-expanded="false" aria-label="Ver aviso / Show notice">
+      <span class="ic ic-chevron-down" aria-hidden="true"></span>
+    </button>
+    <button type="button" class="ds-btn ds-btn--secondary ds-btn--board" id="btn-dismiss-banner">Entendido / Got it</button>
+  </section>
+
+  <main class="cv-board surface-board" id="board">
+
+    <!-- Main canvas surface: objects (scene) + board ink -->
+    <div class="cv-viewport" id="canvas-viewport">
+      <div class="cv-scene" id="scene-layer"></div>
+      <canvas class="cv-ink" id="ink-canvas"></canvas>
+      <div class="cv-empty" id="empty-hint" aria-hidden="true">
+        <span class="ic ic-file-up cv-empty__icon"></span>
+        <span class="ds-bi cv-empty__label">
+          <span class="ds-bi__es" lang="es">Suelta un PDF o imagen</span>
+          <span class="ds-bi__en" lang="en">Drop a PDF or image</span>
+        </span>
+      </div>
+      <div class="cv-drop-veil" id="drop-veil" hidden></div>
+    </div>
+
+    <!-- C0 floating docks, inset 16px (DS layout rules). Two docks wrap to two rows below 1600px. -->
+    <div class="cv-chrome">
+      <div class="ds-dock" role="toolbar" aria-label="Herramientas y materiales / Tools and materials">
+        <button type="button" class="ds-tool" data-tool="select" aria-pressed="false" title="Elegir / Select">
+          <span class="ic ic-mouse-pointer-2" aria-hidden="true"></span><span lang="es">Elegir</span><span lang="en" class="ds-tool__en">Select</span>
+        </button>
+        <div class="cv-pen-wrap">
+          <button type="button" class="ds-tool" data-tool="pen" aria-pressed="true" aria-haspopup="true" aria-expanded="false" title="Lápiz: toca otra vez para color y grosor / Pen: tap again for colour and thickness">
+            <span class="ic ic-pen" aria-hidden="true"></span><span lang="es">Lápiz</span><span lang="en" class="ds-tool__en">Pen</span>
+          </button>
+          <div class="cv-pen" data-pen-options role="group" aria-label="Lápiz: color y grosor / Pen: colour and thickness" hidden></div>
+        </div>
+        <button type="button" class="ds-tool" data-tool="eraser" aria-pressed="false" title="Goma / Eraser">
+          <span class="ic ic-eraser" aria-hidden="true"></span><span lang="es">Goma</span><span lang="en" class="ds-tool__en">Eraser</span>
+        </button>
+        <button type="button" class="ds-tool" data-tool="text" aria-pressed="false" title="Texto / Text">
+          <span class="ic ic-type" aria-hidden="true"></span><span lang="es">Texto</span><span lang="en" class="ds-tool__en">Text</span>
+        </button>
+        <span class="ds-dock__sep" role="separator"></span>
+        <button type="button" class="ds-tool" data-act="add-sticky" title="Nota adhesiva / Sticky note">
+          <span class="ic ic-sticky-note" aria-hidden="true"></span><span lang="es">Nota</span><span lang="en" class="ds-tool__en">Note</span>
+        </button>
+        <button type="button" class="ds-tool" data-act="add-image" title="Añadir imagen / Add image">
+          <span class="ic ic-image" aria-hidden="true"></span><span lang="es">Imagen</span><span lang="en" class="ds-tool__en">Image</span>
+        </button>
+        <button type="button" class="ds-tool" data-act="add-pdf" title="Añadir PDF / Add PDF">
+          <span class="ic ic-file-up" aria-hidden="true"></span><span lang="es">PDF</span><span lang="en" class="ds-tool__en">PDF</span>
+        </button>
+        <button type="button" class="ds-tool" data-act="add-link" title="Añadir enlace / Add link">
+          <span class="ic ic-link" aria-hidden="true"></span><span lang="es">Enlace</span><span lang="en" class="ds-tool__en">Link</span>
+        </button>
+        <button type="button" class="ds-tool" id="btn-add-webcard" title="Tarjeta web (v1.1) / Web card (v1.1)">
+          <span class="ic ic-layout-grid" aria-hidden="true"></span><span lang="es">Tarjeta web</span><span lang="en" class="ds-tool__en">Web card</span>
+        </button>
+      </div>
+
+      <div class="cv-chrome__right">
+        <div class="ds-dock" role="toolbar" aria-label="Historial, zoom y archivo / History, zoom and file">
+          <button type="button" class="ds-tool" id="btn-undo" title="Deshacer / Undo">
+            <span class="ic ic-undo-2" aria-hidden="true"></span><span lang="es">Deshacer</span><span lang="en" class="ds-tool__en">Undo</span>
+          </button>
+          <button type="button" class="ds-tool" id="btn-redo" title="Rehacer / Redo">
+            <span class="ic ic-redo-2" aria-hidden="true"></span><span lang="es">Rehacer</span><span lang="en" class="ds-tool__en">Redo</span>
+          </button>
+          <span class="ds-dock__sep" role="separator"></span>
+          <div class="ds-zoom">
+            <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-zoom-out" aria-label="Alejar / Zoom out" title="Alejar / Zoom out"><span class="ic ic-minus" aria-hidden="true"></span></button>
+            <button type="button" class="ds-zoom__value" id="zoom-display" aria-label="Zoom: escribir porcentaje / type percentage" title="Zoom">100%</button>
+            <input type="text" inputmode="numeric" class="ds-input ds-input--board cv-zoom-input" id="zoom-input" aria-label="Zoom %" hidden>
+            <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-zoom-in" aria-label="Acercar / Zoom in" title="Acercar / Zoom in"><span class="ic ic-plus" aria-hidden="true"></span></button>
+            <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-fit" aria-label="Ajustar / Fit" title="Ajustar / Fit"><span class="ic ic-maximize" aria-hidden="true"></span></button>
+          </div>
+          <span class="ds-dock__sep" role="separator"></span>
+          <button type="button" class="ds-tool" id="btn-clear-ink" title="Borrar tinta / Clear ink">
+            <span class="ic ic-brush-cleaning" aria-hidden="true"></span><span lang="es">Borrar tinta</span><span lang="en" class="ds-tool__en">Clear ink</span>
+          </button>
+          <button type="button" class="ds-tool" id="btn-more" aria-haspopup="menu" aria-expanded="false" title="Más / More">
+            <span class="ic ic-ellipsis-vertical" aria-hidden="true"></span><span lang="es">Más</span><span lang="en" class="ds-tool__en">More</span>
+          </button>
+        </div>
+
+        <!-- Overflow menu: save, open, clear board, settings -->
+        <div class="cv-menu" id="overflow-menu" role="menu" hidden>
+          <button type="button" class="cv-menu__item" role="menuitem" id="menu-save">
+            <span class="ic ic-save" aria-hidden="true"></span>
+            <span class="ds-bi"><span class="ds-bi__es" lang="es">Guardar lección</span><span class="ds-bi__en" lang="en">Save lesson</span></span>
+          </button>
+          <button type="button" class="cv-menu__item" role="menuitem" id="menu-open">
+            <span class="ic ic-folder-open" aria-hidden="true"></span>
+            <span class="ds-bi"><span class="ds-bi__es" lang="es">Abrir lección</span><span class="ds-bi__en" lang="en">Open lesson</span></span>
+          </button>
+          <button type="button" class="cv-menu__item cv-menu__item--danger" role="menuitem" id="menu-clear-board">
+            <span class="ic ic-trash-2" aria-hidden="true"></span>
+            <span class="ds-bi"><span class="ds-bi__es" lang="es">Borrar tablero</span><span class="ds-bi__en" lang="en">Clear board</span></span>
+          </button>
+          <button type="button" class="cv-menu__item" role="menuitem" id="menu-settings">
+            <span class="ic ic-settings" aria-hidden="true"></span>
+            <span class="ds-bi"><span class="ds-bi__es" lang="es">Ajustes</span><span class="ds-bi__en" lang="en">Settings</span></span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status chips, bottom-left (DS layout rules) -->
+    <div class="cv-status" role="group" aria-label="Estado / Status">
+      <button type="button" class="ds-chip cv-chip" id="chip-overlay" data-overlay-chip aria-label="Overlay: cambiar estado / change state">
+        <span class="ic ic-info" aria-hidden="true"></span><span class="cv-chip__label">Overlay ?</span>
+      </button>
+      <span class="ds-badge cv-badge" id="chip-active-tool">herramienta: lápiz / tool: pen</span>
+      <span class="ds-badge ds-badge--warning cv-badge" id="chip-pen-touch">pen/touch: provisional</span>
+      <span class="ds-badge ds-badge--info cv-badge" id="chip-unsaved" hidden>• sin guardar / unsaved</span>
+      <span class="ds-badge ds-badge--success cv-badge" id="chip-wdk-status" hidden>WDK: GX</span>
+    </div>
+
+    <div class="cv-toasts" id="toasts" aria-live="polite"></div>
+  </main>
+
+  <!-- C3 PDF book viewer: native pages from the dropped file, never an iframe (AC8) -->
+  <div class="cv-pdf" id="pdf-viewer-overlay" role="dialog" aria-modal="true" aria-label="Libro PDF / PDF book" hidden>
+    <header class="cv-pdf__bar">
+      <button type="button" class="ds-btn ds-btn--secondary ds-btn--board" id="btn-pdf-close" title="Volver al tablero / Back to board">
+        <span class="ic ic-arrow-left" aria-hidden="true"></span>Tablero / Board
+      </button>
+      <h2 class="cv-pdf__title" id="pdf-viewer-title"></h2>
+      <span class="cv-pdf__grow"></span>
+      <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-prev" aria-label="Página anterior / Previous page" title="Anterior / Previous"><span class="ic ic-chevron-left" aria-hidden="true"></span></button>
+      <input type="text" inputmode="numeric" class="ds-input ds-input--board cv-pdf__page-input" id="pdf-page-input" aria-label="página / page" value="1">
+      <span class="cv-pdf__count">/ <span id="pdf-total-pages">1</span></span>
+      <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-next" aria-label="Página siguiente / Next page" title="Siguiente / Next"><span class="ic ic-chevron-right" aria-hidden="true"></span></button>
+      <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-zoom-out" aria-label="Alejar / Zoom out" title="Alejar / Zoom out"><span class="ic ic-zoom-out" aria-hidden="true"></span></button>
+      <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-zoom-in" aria-label="Acercar / Zoom in" title="Acercar / Zoom in"><span class="ic ic-zoom-in" aria-hidden="true"></span></button>
+      <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-fit" aria-label="Ajustar / Fit" title="Ajustar / Fit"><span class="ic ic-maximize" aria-hidden="true"></span></button>
+    </header>
+
+    <div class="cv-pdf__tools">
+      <div class="ds-dock" role="toolbar" aria-label="Herramientas del libro / Book tools">
+        <button type="button" class="ds-tool" data-pdf-tool="select" aria-pressed="false" title="Elegir / Select">
+          <span class="ic ic-mouse-pointer-2" aria-hidden="true"></span><span lang="es">Elegir</span><span lang="en" class="ds-tool__en">Select</span>
+        </button>
+        <div class="cv-pen-wrap">
+          <button type="button" class="ds-tool" data-pdf-tool="pen" aria-pressed="true" aria-haspopup="true" aria-expanded="false" title="Lápiz: toca otra vez para color y grosor / Pen: tap again for colour and thickness">
+            <span class="ic ic-pen" aria-hidden="true"></span><span lang="es">Lápiz</span><span lang="en" class="ds-tool__en">Pen</span>
+          </button>
+          <div class="cv-pen" data-pen-options role="group" aria-label="Lápiz: color y grosor / Pen: colour and thickness" hidden></div>
+        </div>
+        <button type="button" class="ds-tool" data-pdf-tool="eraser" aria-pressed="false" title="Goma / Eraser">
+          <span class="ic ic-eraser" aria-hidden="true"></span><span lang="es">Goma</span><span lang="en" class="ds-tool__en">Eraser</span>
+        </button>
+        <span class="ds-dock__sep" role="separator"></span>
+        <button type="button" class="ds-tool" id="btn-pdf-undo" title="Deshacer / Undo">
+          <span class="ic ic-undo-2" aria-hidden="true"></span><span lang="es">Deshacer</span><span lang="en" class="ds-tool__en">Undo</span>
+        </button>
+        <button type="button" class="ds-tool" id="btn-pdf-redo" title="Rehacer / Redo">
+          <span class="ic ic-redo-2" aria-hidden="true"></span><span lang="es">Rehacer</span><span lang="en" class="ds-tool__en">Redo</span>
+        </button>
+        <span class="ds-dock__sep" role="separator"></span>
+        <button type="button" class="ds-tool" id="btn-pdf-clear" title="Borrar página / Clear page">
+          <span class="ic ic-trash-2" aria-hidden="true"></span><span lang="es">Borrar pág.</span><span lang="en" class="ds-tool__en">Clear page</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="cv-pdf__stage" id="pdf-stage">
+      <div class="cv-pdf__page" id="pdf-page-container">
+        <canvas class="cv-pdf__canvas" id="pdf-page-canvas"></canvas>
+        <canvas class="cv-pdf__ink" id="pdf-ink-canvas"></canvas>
+        <div class="cv-pdf__msg" id="pdf-msg" role="status" hidden></div>
+      </div>
+    </div>
+
+    <footer class="cv-pdf__status">
+      <button type="button" class="ds-chip cv-chip" data-overlay-chip aria-label="Overlay: cambiar estado / change state">
+        <span class="ic ic-info" aria-hidden="true"></span><span class="cv-chip__label">Overlay ?</span>
+      </button>
+      <span class="cv-pdf__info" id="pdf-status-text"></span>
+    </footer>
+  </div>
+
+  <!-- Dialogs (clear, load-replace, link, web card, settings) render here: DS Dialog markup -->
+  <div class="ds-scrim" id="dialog-host" hidden></div>
+
+  <!-- Hidden pickers -->
+  <input type="file" id="lesson-file-input" accept=".json,application/json" hidden>
+  <input type="file" id="pdf-file-input" accept="application/pdf,.pdf" multiple hidden>
+  <input type="file" id="image-file-input" accept="image/*" multiple hidden>
+  <input type="file" id="probe-file-input" accept=".json,application/json" hidden>
+</div>
+
+<script src="vendor/pdfjs/pdf.min.js"></script>
+<script src="canvas-core.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
