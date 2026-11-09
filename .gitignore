@@ -1,3 +1,17 @@
+# Python
 __pycache__/
 *.pyc
+
+# Build output
 dist/
+node_modules/
+
+# Local editor / OS
+.vscode/settings.json
+.DS_Store
+Thumbs.db
+
+# Secrets / logs
+.env
+.env.*
+*.log
