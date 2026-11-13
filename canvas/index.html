@@ -31,13 +31,6 @@
     <div class="cv-viewport" id="canvas-viewport">
       <div class="cv-scene" id="scene-layer"></div>
       <canvas class="cv-ink" id="ink-canvas"></canvas>
-      <div class="cv-empty" id="empty-hint" aria-hidden="true">
-        <span class="ic ic-file-up cv-empty__icon"></span>
-        <span class="ds-bi cv-empty__label">
-          <span class="ds-bi__es" lang="es">Suelta un PDF o imagen</span>
-          <span class="ds-bi__en" lang="en">Drop a PDF or image</span>
-        </span>
-      </div>
       <div class="cv-drop-veil" id="drop-veil" hidden></div>
     </div>
 
@@ -153,6 +146,10 @@
       <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-zoom-out" aria-label="Alejar / Zoom out" title="Alejar / Zoom out"><span class="ic ic-zoom-out" aria-hidden="true"></span></button>
       <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-zoom-in" aria-label="Acercar / Zoom in" title="Acercar / Zoom in"><span class="ic ic-zoom-in" aria-hidden="true"></span></button>
       <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-fit" aria-label="Ajustar / Fit" title="Ajustar / Fit"><span class="ic ic-maximize" aria-hidden="true"></span></button>
+      <span class="cv-pdf__seg" role="group" aria-label="Vista / View">
+        <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-view-1" aria-pressed="true" aria-label="Una página / One page" title="Una página / One page"><span class="ic ic-file-text" aria-hidden="true"></span></button>
+        <button type="button" class="ds-iconbtn ds-iconbtn--board" id="btn-pdf-view-2" aria-pressed="false" aria-label="Dos páginas / Two pages" title="Dos páginas / Two pages"><span class="ic ic-book-open" aria-hidden="true"></span></button>
+      </span>
     </header>
 
     <div class="cv-pdf__tools">
@@ -177,16 +174,22 @@
           <span class="ic ic-redo-2" aria-hidden="true"></span><span lang="es">Rehacer</span><span lang="en" class="ds-tool__en">Redo</span>
         </button>
         <span class="ds-dock__sep" role="separator"></span>
-        <button type="button" class="ds-tool" id="btn-pdf-clear" title="Borrar página / Clear page">
-          <span class="ic ic-trash-2" aria-hidden="true"></span><span lang="es">Borrar pág.</span><span lang="en" class="ds-tool__en">Clear page</span>
+        <button type="button" class="ds-tool" id="btn-pdf-clear" title="Borrar tinta / Clear ink">
+          <span class="ic ic-brush-cleaning" aria-hidden="true"></span><span lang="es">Borrar tinta</span><span lang="en" class="ds-tool__en">Clear ink</span>
         </button>
       </div>
     </div>
 
     <div class="cv-pdf__stage" id="pdf-stage">
-      <div class="cv-pdf__page" id="pdf-page-container">
-        <canvas class="cv-pdf__canvas" id="pdf-page-canvas"></canvas>
-        <canvas class="cv-pdf__ink" id="pdf-ink-canvas"></canvas>
+      <div class="cv-pdf__spread" id="pdf-page-container">
+        <div class="cv-pdf__page">
+          <canvas class="cv-pdf__canvas"></canvas>
+          <canvas class="cv-pdf__ink"></canvas>
+        </div>
+        <div class="cv-pdf__page" hidden>
+          <canvas class="cv-pdf__canvas"></canvas>
+          <canvas class="cv-pdf__ink"></canvas>
+        </div>
         <div class="cv-pdf__msg" id="pdf-msg" role="status" hidden></div>
       </div>
     </div>

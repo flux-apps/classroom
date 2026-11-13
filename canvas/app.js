@@ -311,7 +311,6 @@
 
   function afterChange(markDirty = true) {
     if (markDirty) setDirty(true);
-    $('empty-hint').hidden = sg.objects.size > 0 || sg.strokes.length > 0;
     $('btn-undo').disabled = sg.undoStack.length === 0;
     $('btn-redo').disabled = sg.redoStack.length === 0;
   }
@@ -1187,14 +1186,19 @@
   }
 
   // ---------- C3 PDF book viewer ----------
-  const V = { doc: null, proxy: null, zoom: 1, tool: 'pen', cssScale: 1, token: 0, renderTask: null, lastGood: 1, gesture: null, live: null, hidden: new Set(), busyBack: false };
+  const V = { doc: null, proxy: null, zoom: 1, tool: 'pen', view: 1, active: 1, token: 0, renderTask: null, lastGood: 1, gesture: null, live: null, hidden: new Set(), busyBack: false };
+  try { if (localStorage.getItem('pdfView') === '2') V.view = 2; } catch (e) { /* storage unavailable */ }
   const pdfEl = $('pdf-viewer-overlay');
   const pdfStage = $('pdf-stage');
-  const pdfPage = $('pdf-page-container');
-  const pdfCanvas = $('pdf-page-canvas');
-  const pdfInk = $('pdf-ink-canvas');
-  const pdfInkCtx = pdfInk.getContext('2d');
+  const pdfSpread = $('pdf-page-container');
   const pdfMsg = $('pdf-msg');
+  // One slot per visible page; slot.n is the page number shown (0 = empty), slot.scale its CSS scale.
+  const slots = Array.from(pdfSpread.querySelectorAll('.cv-pdf__page')).map(el => {
+    const ink = el.querySelector('.cv-pdf__ink');
+    return { el, canvas: el.querySelector('.cv-pdf__canvas'), ink, ctx: ink.getContext('2d'), n: 0, scale: 1 };
+  });
+  const visibleSlots = () => slots.filter(s => s.n > 0);
+  const slotOf = target => slots.find(s => s.ink === target && s.n > 0);
 
   function getProxy(doc) {
     if (!proxies.has(doc.id)) {
@@ -1213,12 +1217,35 @@
       toast('No se pudo abrir el libro', 'Could not open the book', 'error', 'triangle-alert');
       return;
     }
-    V.doc = doc; V.proxy = proxy; V.zoom = 1; V.lastGood = doc.currentPage; V.busyBack = false;
+    V.doc = doc; V.proxy = proxy; V.zoom = 1; V.lastGood = doc.currentPage; V.active = doc.currentPage; V.busyBack = false;
     $('pdf-viewer-title').textContent = doc.title;
     $('pdf-total-pages').textContent = String(doc.pageCount);
     pdfEl.hidden = false;
     setViewerTool(V.tool);
+    syncViewButtons();
     $('btn-pdf-close').focus();
+    renderPdfPage();
+  }
+
+  function syncViewButtons() {
+    $('btn-pdf-view-1').setAttribute('aria-pressed', String(V.view === 1));
+    $('btn-pdf-view-2').setAttribute('aria-pressed', String(V.view === 2));
+  }
+
+  function setPdfView(view) {
+    if (view === V.view) return;
+    V.view = view;
+    try { localStorage.setItem('pdfView', String(view)); } catch (e) { /* storage unavailable */ }
+    syncViewButtons();
+    if (V.doc) { V.active = V.doc.currentPage; renderPdfPage(); }
+  }
+
+  function stepPdfPage(dir) {
+    const doc = V.doc;
+    if (!doc) return;
+    const target = doc.currentPage + dir * V.view;
+    if (!doc.goToPage(Math.min(doc.pageCount, Math.max(1, target)))) return;
+    V.active = doc.currentPage;
     renderPdfPage();
   }
 
@@ -1242,12 +1269,13 @@
 
   function updateViewerStatus() {
     if (!V.doc) return;
-    const n = V.doc.currentPage;
+    const n = V.active;
+    const last = Math.min(V.doc.pageCount, V.doc.currentPage + V.view - 1);
     $('pdf-status-text').textContent = `tinta en la página ${n} · ink on page ${n} · zoom ${Math.round(V.zoom * 100)}%`;
     $('btn-pdf-undo').disabled = !V.doc.canUndoPage(n);
     $('btn-pdf-redo').disabled = !V.doc.canRedoPage(n);
-    $('btn-pdf-prev').disabled = n <= 1;
-    $('btn-pdf-next').disabled = n >= V.doc.pageCount;
+    $('btn-pdf-prev').disabled = V.doc.currentPage <= 1;
+    $('btn-pdf-next').disabled = last >= V.doc.pageCount;
   }
 
   function showPdfMessage(es, en) {
@@ -1258,63 +1286,80 @@
   async function renderPdfPage() {
     const doc = V.doc;
     if (!doc) return;
-    const n = doc.currentPage;
+    const first = doc.currentPage;
+    const wanted = [first];
+    if (V.view === 2 && first + 1 <= doc.pageCount) wanted.push(first + 1);
+    if (!wanted.includes(V.active)) V.active = first;
+    const label = wanted.join('–');
     const token = ++V.token;
-    $('pdf-page-input').value = String(n);
+    $('pdf-page-input').value = String(first);
     updateViewerStatus();
-    showPdfMessage(`cargando p.${n}`, `loading p.${n}`);
+    showPdfMessage(`cargando p.${label}`, `loading p.${label}`);
     try {
-      const page = await V.proxy.getPage(n);
+      const pages = await Promise.all(wanted.map(n => V.proxy.getPage(n)));
       if (token !== V.token) return;
-      const base = page.getViewport({ scale: 1 });
-      const availW = Math.max(100, pdfStage.clientWidth - 32);
+      const bases = pages.map(p => p.getViewport({ scale: 1 }));
+      const gap = bases.length > 1 ? 8 : 0;
+      const availW = Math.max(100, pdfStage.clientWidth - 32 - gap);
       const availH = Math.max(100, pdfStage.clientHeight - 32);
-      const fit = Math.min(availW / base.width, availH / base.height);
-      V.cssScale = fit * V.zoom;
+      const sumW = bases.reduce((a, b) => a + b.width, 0);
+      const maxH = Math.max(...bases.map(b => b.height));
+      const scale = Math.min(availW / sumW, availH / maxH) * V.zoom;
       const dpr = window.devicePixelRatio || 1;
-      const vp = page.getViewport({ scale: V.cssScale * dpr });
-      pdfPage.style.setProperty('--pw', `${base.width * V.cssScale}px`);
-      pdfPage.style.setProperty('--ph', `${base.height * V.cssScale}px`);
-      pdfCanvas.width = pdfInk.width = Math.floor(vp.width);
-      pdfCanvas.height = pdfInk.height = Math.floor(vp.height);
       if (V.renderTask) { try { V.renderTask.cancel(); } catch (e) { /* done */ } }
-      V.renderTask = page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport: vp });
-      await V.renderTask.promise;
+      const tasks = [];
+      slots.forEach((s, i) => {
+        s.el.hidden = i >= pages.length;
+        s.n = i < pages.length ? wanted[i] : 0;
+        if (i >= pages.length) return;
+        const vp = pages[i].getViewport({ scale: scale * dpr });
+        s.scale = scale;
+        s.el.style.setProperty('--pw', `${bases[i].width * scale}px`);
+        s.el.style.setProperty('--ph', `${bases[i].height * scale}px`);
+        s.canvas.width = s.ink.width = Math.floor(vp.width);
+        s.canvas.height = s.ink.height = Math.floor(vp.height);
+        tasks.push(pages[i].render({ canvasContext: s.canvas.getContext('2d'), viewport: vp }));
+      });
+      V.renderTask = { cancel: () => tasks.forEach(t => t.cancel()) };
+      await Promise.all(tasks.map(t => t.promise));
       if (token !== V.token) return;
       pdfMsg.hidden = true;
-      V.lastGood = n;
+      V.lastGood = first;
       redrawPdfInk();
     } catch (err) {
       if (token !== V.token || (err && err.name === 'RenderingCancelledException')) return;
       console.error('PDF page failed', err);
-      toast(`No se pudo abrir la página ${n}`, `Could not open page ${n}`, 'error', 'triangle-alert');
-      if (V.lastGood !== n) { doc.currentPage = V.lastGood; renderPdfPage(); }
-      else showPdfMessage(`No se pudo abrir la página ${n}`, `Could not open page ${n}`);
+      toast(`No se pudo abrir la página ${label}`, `Could not open page ${label}`, 'error', 'triangle-alert');
+      if (V.lastGood !== first) { doc.currentPage = V.lastGood; V.active = V.lastGood; renderPdfPage(); }
+      else showPdfMessage(`No se pudo abrir la página ${label}`, `Could not open page ${label}`);
     }
   }
 
   function goToPdfPage(n) {
     if (!V.doc || !V.doc.goToPage(n)) { $('pdf-page-input').value = String(V.doc ? V.doc.currentPage : 1); return; }
+    V.active = V.doc.currentPage;
     renderPdfPage();
   }
 
   function redrawPdfInk() {
     if (!V.doc) return;
     const dpr = window.devicePixelRatio || 1;
-    const k = V.cssScale * dpr;
-    pdfInkCtx.setTransform(k, 0, 0, k, 0, 0);
-    pdfInkCtx.clearRect(0, 0, pdfInk.width / k, pdfInk.height / k);
     const color = inkColor();
-    for (const s of V.doc.getStrokes(V.doc.currentPage)) {
-      if (V.hidden.has(s.id) || !s.points.length) continue;
-      drawPolyline(pdfInkCtx, s.points, s.color || color, s.width);
+    for (const s of visibleSlots()) {
+      const k = s.scale * dpr;
+      s.ctx.setTransform(k, 0, 0, k, 0, 0);
+      s.ctx.clearRect(0, 0, s.ink.width / k, s.ink.height / k);
+      for (const st of V.doc.getStrokes(s.n)) {
+        if (V.hidden.has(st.id) || !st.points.length) continue;
+        drawPolyline(s.ctx, st.points, st.color || color, st.width);
+      }
+      if (V.live && V.live.length && V.gesture && V.gesture.slot === s) drawPolyline(s.ctx, V.live, penColor, penWidth);
     }
-    if (V.live && V.live.length) drawPolyline(pdfInkCtx, V.live, penColor, penWidth);
   }
 
-  const pagePoint = e => {
-    const r = pdfInk.getBoundingClientRect();
-    return { x: (e.clientX - r.left) / V.cssScale, y: (e.clientY - r.top) / V.cssScale };
+  const pagePoint = (e, slot) => {
+    const r = slot.ink.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / slot.scale, y: (e.clientY - r.top) / slot.scale };
   };
 
   function onPdfPointerDown(e) {
@@ -1323,22 +1368,24 @@
     let action = routePointerAction(e, V.tool);
     if (V.tool === 'select' && action === 'draw_ink') action = 'pan_canvas';
     if (action === 'select_object') action = 'pan_canvas';
-    const onPage = e.target === pdfInk;
-    if (action === 'draw_ink' && onPage) {
-      V.live = [pagePoint(e)];
-      V.gesture = { kind: 'ink', pointerId: e.pointerId };
-    } else if (action === 'erase_ink' && onPage) {
-      V.gesture = { kind: 'erase', pointerId: e.pointerId, ids: new Set() };
-      pdfErase(pagePoint(e));
+    const slot = slotOf(e.target);
+    if (slot) { V.active = slot.n; updateViewerStatus(); }
+    if (action === 'draw_ink' && slot) {
+      V.live = [pagePoint(e, slot)];
+      V.gesture = { kind: 'ink', pointerId: e.pointerId, slot };
+    } else if (action === 'erase_ink' && slot) {
+      V.gesture = { kind: 'erase', pointerId: e.pointerId, ids: new Set(), slot };
+      pdfErase(pagePoint(e, slot));
     } else {
       V.gesture = { kind: 'pan', pointerId: e.pointerId, last: { x: e.clientX, y: e.clientY } };
     }
   }
 
   function pdfErase(p) {
-    const r = ERASER_RADIUS_PX / V.cssScale;
+    const slot = V.gesture.slot;
+    const r = ERASER_RADIUS_PX / slot.scale;
     let changed = false;
-    for (const s of V.doc.getStrokes(V.doc.currentPage)) {
+    for (const s of V.doc.getStrokes(slot.n)) {
       if (V.gesture.ids.has(s.id)) continue;
       if (strokeNearPoint(s.points, p, r + s.width / 2)) { V.gesture.ids.add(s.id); changed = true; }
     }
@@ -1348,8 +1395,8 @@
   function onPdfPointerMove(e) {
     const g = V.gesture;
     if (!g || e.pointerId !== g.pointerId || !V.doc) return;
-    if (g.kind === 'ink') { V.live.push(pagePoint(e)); redrawPdfInk(); }
-    else if (g.kind === 'erase') pdfErase(pagePoint(e));
+    if (g.kind === 'ink') { V.live.push(pagePoint(e, g.slot)); redrawPdfInk(); }
+    else if (g.kind === 'erase') pdfErase(pagePoint(e, g.slot));
     else if (g.kind === 'pan') {
       pdfStage.scrollLeft -= e.clientX - g.last.x;
       pdfStage.scrollTop -= e.clientY - g.last.y;
@@ -1362,7 +1409,7 @@
     if (!g || e.pointerId !== g.pointerId) return;
     V.gesture = null;
     if (!V.doc) return;
-    const n = V.doc.currentPage;
+    const n = g.slot ? g.slot.n : V.active;
     if (g.kind === 'ink') {
       const pts = V.live;
       V.live = null;
@@ -1381,18 +1428,18 @@
 
   function pdfHistory(dir) {
     if (!V.doc) return;
-    const n = V.doc.currentPage;
+    const n = V.active;
     if (dir < 0 ? V.doc.undoPage(n) : V.doc.redoPage(n)) { setDirty(true); redrawPdfInk(); updateViewerStatus(); }
   }
 
   async function pdfClearPage() {
     if (!V.doc) return;
-    const n = V.doc.currentPage;
+    const n = V.active;
     if (!V.doc.getStrokes(n).length) { toast('La página no tiene tinta', 'This page has no ink', 'info', 'info'); return; }
     const ok = await confirmDialog({
       title: `¿Borrar la tinta de la página ${n}? / Clear ink on page ${n}?`,
       body: 'Solo esta página; puedes deshacer. / This page only; you can undo.',
-      confirmLabel: 'Borrar página / Clear page', danger: true
+      confirmLabel: 'Borrar tinta / Clear ink', danger: true
     });
     if (!ok || !V.doc) return;
     V.doc.clearPage(n);
@@ -1408,13 +1455,14 @@
 
   // Thumbnail of the board card: last viewed page plus its ink, drawn from the viewer canvases.
   function updateThumbFromViewer(doc) {
-    if (pdfCanvas.width < 2 || pdfMsg.hidden === false) return;
+    const s = slots[0];
+    if (s.canvas.width < 2 || pdfMsg.hidden === false || s.n !== doc.currentPage) return;
     const t = document.createElement('canvas');
     t.width = 320;
-    t.height = Math.round(320 * pdfCanvas.height / pdfCanvas.width);
+    t.height = Math.round(320 * s.canvas.height / s.canvas.width);
     const ctx = t.getContext('2d');
-    ctx.drawImage(pdfCanvas, 0, 0, t.width, t.height);
-    ctx.drawImage(pdfInk, 0, 0, t.width, t.height);
+    ctx.drawImage(s.canvas, 0, 0, t.width, t.height);
+    ctx.drawImage(s.ink, 0, 0, t.width, t.height);
     thumbs.set(doc.id, t.toDataURL('image/jpeg', 0.8));
   }
 
@@ -1533,8 +1581,10 @@
 
     // PDF viewer
     $('btn-pdf-close').addEventListener('click', closeViewer);
-    $('btn-pdf-prev').addEventListener('click', () => { if (V.doc && V.doc.prevPage()) renderPdfPage(); });
-    $('btn-pdf-next').addEventListener('click', () => { if (V.doc && V.doc.nextPage()) renderPdfPage(); });
+    $('btn-pdf-prev').addEventListener('click', () => stepPdfPage(-1));
+    $('btn-pdf-next').addEventListener('click', () => stepPdfPage(1));
+    $('btn-pdf-view-1').addEventListener('click', () => setPdfView(1));
+    $('btn-pdf-view-2').addEventListener('click', () => setPdfView(2));
     $('pdf-page-input').addEventListener('change', e => goToPdfPage(parseInt(e.target.value, 10)));
     $('pdf-page-input').addEventListener('keydown', e => { if (e.key === 'Enter') goToPdfPage(parseInt(e.target.value, 10)); });
     $('btn-pdf-zoom-in').addEventListener('click', () => pdfZoom(0.25));

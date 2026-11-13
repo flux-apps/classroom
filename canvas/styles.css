@@ -91,22 +91,6 @@
 
 .cv-ink { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 
-.cv-empty {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-4);
-  padding-top: 0;
-  color: var(--text-muted);
-  pointer-events: none;
-}
-.cv-empty__icon { --icon-size: 56px; }
-.cv-empty__label { font-size: var(--fs-board-title); line-height: var(--lh-board-title); align-items: center; text-align: center; }
-.cv-empty__label .ds-bi__en { font-size: var(--fs-body); }
-
 .cv-drop-veil {
   position: absolute;
   inset: var(--space-4);
@@ -365,15 +349,25 @@
   cursor: crosshair;
 }
 .cv-pdf[data-tool="select"] .cv-pdf__stage { cursor: grab; }
-.cv-pdf__page {
+.cv-pdf__spread {
   position: relative;
   flex: none;
   margin: auto;
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+.cv-pdf__page {
+  position: relative;
+  flex: none;
   width: var(--pw, 612px);
   height: var(--ph, 792px);
   background: var(--color-paper);
   box-shadow: var(--shadow-dock);
 }
+.cv-pdf__page[hidden] { display: none; }
+.cv-pdf__seg { display: inline-flex; gap: var(--space-1); }
+.cv-pdf__seg .ds-iconbtn[aria-pressed="true"] { background: var(--surface-sunken); box-shadow: inset 0 -3px 0 var(--accent, currentColor); }
 .cv-pdf__canvas, .cv-pdf__ink { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .cv-pdf__ink { touch-action: none; }
 .cv-pdf__msg {
