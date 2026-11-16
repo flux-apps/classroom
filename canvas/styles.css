@@ -101,37 +101,116 @@
   z-index: 10;
 }
 
-/* ---------- C0 docks, inset 16px; right group wraps under the left one below ~1600px ---------- */
-.cv-chrome {
+/* ---------- Side rails (AC17/AC19): tools left, history/zoom/menu right; never a horizontal band ----------
+   Bands follow railMetrics() in canvas-core.js: >=1600 96/72, 1280-1599 88/64, 800-1279 64/56 (icons only), <800 compact. */
+.cv-app {
+  --rail-off: var(--space-2);
+  --rail-w: 96px;
+  --rail-target: 72px;
+  --rail-es: 16px;
+  --rail-en: 12px;
+  --page-inset-x: calc(2 * (var(--rail-w) + var(--space-4)));
+  --side-clear: calc(var(--rail-off) + var(--rail-w) + var(--space-4));
+}
+@media (max-width: 1599px) {
+  .cv-app { --rail-w: 88px; --rail-target: 64px; --rail-es: 14px; --rail-en: 11px; }
+}
+@media (max-width: 1279px) {
+  .cv-app { --rail-w: 64px; --rail-target: 56px; }
+  .cv-rail .ds-tool__es, .cv-rail .ds-tool__en { display: none; }
+}
+/* Short screens (1280x720): drop the English line so ten targets still fit between the margins. */
+@media (max-height: 800px) and (min-width: 1280px) {
+  .cv-app { --rail-target: 56px; }
+  .cv-rail .ds-tool__en { display: none; }
+}
+@media (max-width: 799px) {
+  .cv-app { --rail-w: 0px; --rail-target: 48px; --page-inset-x: calc(2 * var(--space-4)); --side-clear: var(--space-4); }
+}
+.cv-app[data-focus="true"] { --page-inset-x: calc(2 * var(--space-4)); --side-clear: var(--space-4); }
+
+.cv-rail {
   position: absolute;
   top: var(--space-4);
-  left: var(--space-4);
-  right: var(--space-4);
+  bottom: var(--space-4);
+  width: var(--rail-w);
+  height: fit-content;
+  max-height: calc(100% - 2 * var(--space-4));
+  margin-block: auto;
+  padding: var(--space-2);
   display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--space-2);
-  pointer-events: none;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--surface-card);
+  border-radius: var(--r-dock);
+  box-shadow: var(--shadow-dock);
   z-index: 15;
+  transition: opacity var(--dur-fast) var(--ease-out);
 }
-.cv-chrome > * { pointer-events: auto; }
-.cv-chrome__right { position: relative; display: flex; flex-direction: column; align-items: flex-end; margin-left: auto; }
+.cv-rail[data-rail="left"] { left: var(--rail-off); }
+.cv-rail[data-rail="right"] { right: var(--rail-off); }
+.cv-rail .ds-dock__sep { width: auto; height: var(--rule-hair); margin: var(--space-1) 6px; align-self: stretch; flex: none; }
+.cv-rail .ds-tool { flex: none; width: 100%; min-width: 0; height: var(--rail-target); padding: 0; --icon-size: 28px; }
+.cv-rail .ds-tool__es { font-size: var(--rail-es); line-height: 1.1; white-space: nowrap; }
+.cv-rail .ds-tool__en { font-size: var(--rail-en); line-height: 1; white-space: nowrap; }
+.cv-rail .ds-tool[aria-pressed="true"]::after { top: 0; height: 3px; left: 18px; right: 18px; }
+.cv-rail .cv-pen-wrap { display: flex; flex: none; width: 100%; }
+.cv-rail__zoom { font: var(--fw-bold) var(--fs-board-label)/1 var(--font-sans); }
+.cv-rail .cv-zoom-input { width: 100%; height: var(--rail-target); padding: 0; text-align: center; }
+.cv-rail .cv-rail__chip {
+  flex: none; width: 100%; height: var(--rail-target); padding: 0 var(--space-1);
+  flex-direction: column; justify-content: center; gap: 2px;
+  border-radius: var(--r-card); text-align: center; font-size: var(--rail-en); line-height: 1.1;
+}
+.cv-rail .cv-rail__chip .ic { --icon-size: 22px; }
+.cv-rail .cv-rail__chip .cv-chip__label { white-space: normal; }
+.cv-rail__page { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.cv-rail__page .cv-pdf__page-input { width: 100%; height: var(--rail-target); padding: 0; }
+.cv-rail__modes { display: flex; flex-direction: column; gap: var(--space-1); flex: none; }
+.cv-rail__modes .ds-tool[aria-pressed="true"] { background: var(--select); color: var(--color-paper); }
+.cv-rail__modes .ds-tool[aria-pressed="true"] .ds-tool__en { color: inherit; }
+.cv-rail__modes .ds-tool[aria-pressed="true"]::after { background: var(--color-paper); }
 
-/* Board labels: 18px Spanish, 14px English (DS caveat: 14/11 is too small at arm's length). */
-.cv-chrome .ds-tool, .cv-pdf .ds-tool { font-size: var(--fs-board-label); }
-.cv-chrome .ds-tool__en, .cv-pdf .ds-tool__en { font-size: var(--fs-small); }
-.cv-chrome .ds-zoom__value { min-width: var(--hit-board-lg); }
+/* In-stroke dim: 30%, pointer-free, no reflow (opacity only), released on pointerup/cancel. */
+.cv-app[data-inking="true"] .cv-rail { opacity: .3; pointer-events: none; }
+
+/* Pen popover opens sideways; fixed so the scrolling rail never clips it (app.js sets --pen-x/--pen-y). */
+.cv-rail .cv-pen { position: fixed; left: var(--pen-x, 0px); top: var(--pen-y, 0px); margin: 0; z-index: 40; }
+
+/* Edge tabs (focus mode): 24x72 visible, >= 56 px hit area */
+.cv-edgetab {
+  position: absolute; top: 0; bottom: 0; margin-block: auto; width: 24px; height: 72px; padding: 0; z-index: 16;
+  display: grid; place-items: center; background: var(--surface-card); color: var(--text-body);
+  border: var(--rule-1) solid var(--border-strong); box-shadow: var(--shadow-dock); --icon-size: 20px; cursor: pointer;
+}
+.cv-edgetab::before { content: ""; position: absolute; top: -8px; bottom: -8px; width: 56px; }
+.cv-edgetab--left { left: 0; border-left: 0; border-radius: 0 var(--r-card) var(--r-card) 0; }
+.cv-edgetab--left::before { left: 0; }
+.cv-edgetab--right { right: 0; border-right: 0; border-radius: var(--r-card) 0 0 var(--r-card); }
+.cv-edgetab--right::before { right: 0; }
+.cv-edgetab[hidden] { display: none; }
+
+@media (max-width: 799px) {
+  .cv-rail { top: auto; bottom: var(--space-2); left: var(--space-2); right: var(--space-2); width: auto; height: auto; max-height: none; margin: 0; flex-direction: row; overflow-x: auto; overflow-y: hidden; }
+  .cv-rail[data-rail="right"] { bottom: calc(var(--space-2) * 3 + var(--rail-target)); }
+  .cv-rail .ds-tool { width: auto; min-width: var(--rail-target); }
+  .cv-rail .ds-dock__sep { width: var(--rule-hair); height: auto; margin: 6px var(--space-1); }
+  .cv-rail__modes { flex-direction: row; }
+  .cv-rail__page { flex-direction: row; }
+  .cv-rail__page .cv-pdf__page-input { width: 96px; }
+  .cv-edgetab { top: auto; bottom: var(--space-2); margin: 0; }
+}
+
 .cv-zoom-input { width: 96px; text-align: center; }
 
-/* Overflow menu */
+/* Overflow menus (board, PDF, Tarjeta web): hang off the right rail */
 .cv-menu {
   position: absolute;
-  top: 100%;
-  right: 0;
   z-index: 30;
   min-width: 300px;
-  margin-top: var(--space-2);
   padding: var(--space-2);
   display: flex;
   flex-direction: column;
@@ -140,6 +219,10 @@
   border-radius: var(--r-dock);
   box-shadow: var(--shadow-dock);
 }
+.cv-menu--right { right: calc(var(--rail-off) + var(--rail-w) + var(--space-2)); top: var(--space-4); bottom: auto; }
+.cv-board > .cv-menu--right { top: auto; bottom: var(--space-4); }
+.cv-menu__title { margin: 0; padding: var(--space-2) var(--space-4); max-width: 360px; font: var(--fw-bold) var(--fs-board-label)/var(--lh-board-label) var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv-menu__status { margin: 0; padding: var(--space-1) var(--space-4); font-size: var(--fs-small); color: var(--text-muted); }
 .cv-menu__item {
   display: flex;
   align-items: center;
@@ -156,15 +239,16 @@
   transition: background var(--dur-fast) var(--ease-out);
 }
 .cv-menu__item:hover { background: var(--surface-sunken); }
+.cv-menu__item[aria-pressed="true"] { background: var(--select-tile); }
 .cv-menu__item .ds-bi__en { font-size: var(--fs-small); }
 .cv-menu__item--danger { color: var(--color-red-dark); }
 
 /* ---------- Status chips (bottom-left) ---------- */
 .cv-status {
   position: absolute;
-  left: var(--space-4);
+  left: var(--side-clear);
   bottom: var(--space-4);
-  max-width: calc(100% - var(--space-6));
+  max-width: calc(100% - 2 * var(--side-clear));
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -289,7 +373,7 @@
 .cv-web__url { flex: 1; min-width: 0; font-size: var(--fs-small); color: var(--text-muted); overflow-wrap: anywhere; }
 .cv-web__frame {
   position: relative;
-  height: 280px;
+  aspect-ratio: 16 / 9;
   display: grid;
   place-items: center;
   padding: var(--space-4);
@@ -302,59 +386,35 @@
 }
 .cv-web__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--color-paper); }
 .cv-web__frame.is-frozen iframe { pointer-events: none; }
+.cv-web__ink { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.cv-web__head .ds-btn { flex: none; padding: 0 var(--space-3); }
 .cv-web__modes { display: flex; flex-direction: column; gap: var(--space-1); border: 0; margin: 0; padding: 0; }
 .cv-web__modes legend { padding: 0; font-weight: var(--fw-medium); font-size: var(--fs-small); color: var(--text-muted); }
 .cv-web__modes .ds-radio { min-height: var(--hit-min); font-size: var(--fs-board-label); }
 .cv-web__modes .ds-bi__en { font-size: var(--fs-small); }
 .cv-web__helper { display: flex; flex-direction: column; font-size: var(--fs-small); }
 
-/* ---------- C3 PDF book viewer ---------- */
-.cv-pdf {
+/* ---------- Full-screen viewers (C3 PDF book, C7 Tarjeta web): one stage, rails float over the margins ---------- */
+.cv-screen { position: absolute; inset: 0; z-index: 50; background: var(--surface-sunken); overflow: hidden; }
+.cv-pdf__title { margin: 0; }
+.cv-pdf__page-input { width: 96px; text-align: center; }
+.cv-pdf__count { font-size: var(--fs-small); color: var(--text-muted); white-space: nowrap; }
+.cv-pdf__stage {
   position: absolute;
   inset: 0;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  background: var(--surface-sunken);
-}
-.cv-pdf__bar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--hit-board-lg);
-  padding: 0 var(--space-4);
-  background: var(--surface-card);
-  box-shadow: var(--shadow-card);
-}
-.cv-pdf__title {
-  margin: 0;
-  min-width: 0;
-  font: var(--fw-bold) var(--fs-board-title)/var(--lh-board-title) var(--font-sans);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.cv-pdf__grow { flex: 1; }
-.cv-pdf__page-input { width: 96px; text-align: center; }
-.cv-pdf__count { font-size: var(--fs-board-label); color: var(--text-muted); white-space: nowrap; }
-.cv-pdf__tools { flex: none; padding: var(--space-3) var(--space-4) 0; display: flex; }
-.cv-pdf__stage {
-  flex: 1;
-  min-height: 0;
   display: flex;
   overflow: auto;
   padding: var(--space-4);
   touch-action: none;
   cursor: crosshair;
 }
-.cv-pdf[data-tool="select"] .cv-pdf__stage { cursor: grab; }
+.cv-pdf[data-tool="select"] .cv-pdf__stage, .cv-wv[data-tool="select"] .cv-wv__stage { cursor: grab; }
 .cv-pdf__spread {
   position: relative;
   flex: none;
   margin: auto;
   display: flex;
-  gap: var(--space-2);
+  gap: var(--space-4);
   align-items: center;
 }
 .cv-pdf__page {
@@ -366,8 +426,6 @@
   box-shadow: var(--shadow-dock);
 }
 .cv-pdf__page[hidden] { display: none; }
-.cv-pdf__seg { display: inline-flex; gap: var(--space-1); }
-.cv-pdf__seg .ds-iconbtn[aria-pressed="true"] { background: var(--surface-sunken); box-shadow: inset 0 -3px 0 var(--accent, currentColor); }
 .cv-pdf__canvas, .cv-pdf__ink { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .cv-pdf__ink { touch-action: none; }
 .cv-pdf__msg {
@@ -383,17 +441,33 @@
   line-height: var(--lh-board-label);
   white-space: pre-line;
 }
-.cv-pdf__status {
-  flex: none;
+
+/* Tarjeta web: a 16:9 frame (same shape as the card on the board, so ink in frame space lines up) */
+.cv-wv__stage {
+  position: absolute;
+  inset: 0;
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--hit-board);
-  padding: 0 var(--space-4);
-  background: var(--surface-card);
-  font-size: var(--fs-small);
-  color: var(--text-muted);
+  overflow: auto;
+  padding: var(--space-4);
+  touch-action: none;
+  cursor: crosshair;
 }
+.cv-wv__frame {
+  --wv-zoom: 1;
+  position: relative;
+  flex: none;
+  margin: auto;
+  aspect-ratio: 16 / 9;
+  width: calc(min(100% - var(--page-inset-x) + 2 * var(--space-4), (100dvh - 2 * var(--space-4)) * 16 / 9) * var(--wv-zoom));
+  background: var(--color-paper);
+  border-radius: var(--r-note);
+  box-shadow: var(--shadow-dock);
+  overflow: hidden;
+}
+.cv-wv__frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: var(--color-paper); }
+.cv-wv__frame.is-frozen iframe { pointer-events: none; }
+.cv-wv__ink { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.cv-wv__frame.is-interact .cv-wv__ink { pointer-events: none; }
 
 /* ---------- Dialogs (DS Dialog on the scrim) ---------- */
 #dialog-host { z-index: 60; }
@@ -415,8 +489,7 @@
 
 /* ---------- Pen options: popover under the pen tool; colour swatches + thickness (shape cue = ring, never colour alone) ---------- */
 .cv-pen-wrap { position: relative; display: inline-flex; }
-.cv-pen-wrap > .ds-tool::before { content: ""; position: absolute; top: 9px; right: 9px; width: 10px; height: 10px; border-radius: 50%; background: var(--pen-current); box-shadow: 0 0 0 1.5px var(--surface-card); }
-.cv-chrome .ds-tool[aria-pressed="true"]::after, .cv-pdf .ds-tool[aria-pressed="true"]::after { top: 0; height: 3px; left: 18px; right: 18px; }
+.cv-pen-wrap > .ds-tool::before { content: ""; position: absolute; top: 6px; right: 6px; width: 10px; height: 10px; border-radius: 50%; background: var(--pen-current); box-shadow: 0 0 0 1.5px var(--surface-card); }
 .cv-pen {
   position: absolute; top: 100%; left: 0; z-index: 30; margin-top: var(--space-2); padding: var(--space-2);
   display: flex; flex-wrap: wrap; width: calc(var(--hit-min) * 6 + var(--space-1) * 5 + var(--space-2) * 2); gap: var(--space-1);

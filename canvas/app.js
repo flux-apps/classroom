@@ -6,7 +6,8 @@
   const {
     SceneGraph, PdfDocument, WebCard, OverlayChip, LessonSerializer, ProbeGate,
     routePointerAction, objectToWorld, worldToObject, pointInObject, strokeNearPoint,
-    BILINGUAL, STROKE_WIDTH, SCALE_MIN, SCALE_MAX, gridLevels
+    BILINGUAL, STROKE_WIDTH, SCALE_MIN, SCALE_MAX, gridLevels,
+    isInteractAllowed, safeWebUrl, RailState, WebViewer, pdfFitScale, toFrameSpace, fromFrameSpace
   } = window.CanvasCore;
 
   const STICKY_COLORS = ['yellow', 'green', 'teal', 'pink', 'lavender'];
@@ -44,11 +45,14 @@
   const inkCtx = inkCanvas.getContext('2d');
   const toasts = $('toasts');
   const dialogHost = $('dialog-host');
-  const overflowMenu = $('overflow-menu');
   const zoomDisplay = $('zoom-display');
   const zoomInput = $('zoom-input');
   const css = getComputedStyle(document.documentElement);
   const inkColor = () => css.getPropertyValue('--text-body').trim();
+
+  // ---------- Rails, focus mode, in-stroke dim (AC17-AC19) ----------
+  // One RailState for every screen; focus is a session preference and is never written into the lesson file.
+  const rails = new RailState({ storage: (() => { try { return window.sessionStorage; } catch (e) { return null; } })() });
 
   // ---------- Pen options (colour + thickness), shared by board and PDF book ----------
   const PEN_COLORS = [
@@ -95,13 +99,20 @@
       btn.addEventListener('click', () => {
         const open = btn.getAttribute('aria-pressed') === 'true' && host.hidden;
         closePen();
-        if (open) { host.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+        if (open) {
+          // The popover opens sideways, beside the rail (fixed, so the scrolling rail never clips it).
+          const r = btn.getBoundingClientRect();
+          host.style.setProperty('--pen-x', `${r.right + 8}px`);
+          host.hidden = false;
+          host.style.setProperty('--pen-y', `${Math.max(8, Math.min(r.top, window.innerHeight - host.offsetHeight - 8))}px`);
+          btn.setAttribute('aria-expanded', 'true');
+        }
       });
     });
     document.addEventListener('pointerdown', e => { if (!e.target.closest('.cv-pen-wrap')) closePen(); });
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closePen(); });
     // Switching to another tool closes the panel too (those clicks never reach the pen button).
-    document.querySelectorAll('.ds-tool[data-tool], .ds-tool[data-pdf-tool]').forEach(b => {
+    document.querySelectorAll('.ds-tool[data-tool], .ds-tool[data-pdf-tool], .ds-tool[data-web-tool]').forEach(b => {
       if (!b.closest('.cv-pen-wrap')) b.addEventListener('click', closePen);
     });
     refresh();
@@ -374,7 +385,13 @@
     } catch (e) { return null; }
   }
 
+  function refuseUrl() {
+    const l = BILINGUAL.webViewer.blockedUrl;
+    toast(l.es, l.en, 'error', 'triangle-alert');
+  }
+
   function openLink(url) {
+    if (!safeWebUrl(url)) { refuseUrl(); return; }
     const w = window.open(url, '_blank');
     if (w) {
       try { w.opener = null; } catch (e) { /* cross-origin */ }
@@ -454,18 +471,21 @@
   }
 
   function buildWebCard(el, obj) {
-    const card = webModel(obj) || (() => { const c = new WebCard(obj.url, obj.title); c.id = obj.webCardId; webCards.push(c); return c; })();
+    const card = webModel(obj) || (() => { const c = new WebCard(safeWebUrl(obj.url) ? obj.url : '', obj.title); c.id = obj.webCardId; webCards.push(c); return c; })();
     el.classList.add('cv-web');
     el.setAttribute('aria-label', 'tarjeta web / web page');
     const frame = h('div', { class: 'cv-web__frame' },
       h('span', { class: 'cv-bi-stack' },
         h('strong', { text: hostOf(card.url) }),
-        h('span', { text: 'Fija: tinta nuestra, página quieta. / Frozen: our ink, page still.' })));
+        h('span', { text: 'Fija: tinta nuestra, página quieta. / Frozen: our ink, page still.' })),
+      h('canvas', { class: 'cv-web__ink', 'aria-hidden': 'true' }));
     const modes = h('fieldset', { class: 'cv-web__modes', role: 'radiogroup', 'aria-label': 'Modo de la tarjeta web / Web card mode' },
       h('legend', { text: 'Modo / Mode' }));
     const radio = (value, es, en) => {
       const input = h('input', { type: 'radio', name: `mode-${card.id}`, value, checked: card.mode === value,
-        on: { change: () => { card.setMode(value); applyWebMode(el, card); setDirty(true); } } });
+        on: { change: () => { try { card.setMode(value); setDirty(true); } catch (e) { /* fenced host: stays Frozen */ } applyWebMode(el, card); } } });
+      // Interact is fenced off for hosts that must stay Frozen (AC16): the control is disabled, not hidden.
+      if (value === 'interact' && !isInteractAllowed(card.url)) input.disabled = true;
       return h('label', { class: 'ds-radio acc-teal' }, input, h('span', { class: 'ds-radio__dot' }), bi(es, en));
     };
     modes.append(
@@ -475,12 +495,35 @@
       h('span', { class: 'ds-frame__title' }, bi('Tarjeta web', 'Web page'), h('span', { class: 'ds-badge', text: 'v1.1' })),
       h('div', { class: 'cv-web__body' },
         h('div', { class: 'cv-web__head' }, icon('link'), h('span', { class: 'cv-web__url', text: card.url }),
+          // The only way into full-screen: an explicit tap here (AC18). Never on drop, never automatic.
+          h('button', { type: 'button', class: 'ds-btn ds-btn--secondary ds-btn--board', data: { act: 'web-fullscreen' },
+            title: 'Pantalla completa / Full screen', 'aria-label': 'Pantalla completa / Full screen',
+            on: { click: e => { e.stopPropagation(); openWebViewer(card); } } }, icon('maximize'), bi('Pantalla completa', 'Full screen')),
           h('button', { type: 'button', class: 'ds-iconbtn ds-iconbtn--board', 'aria-label': 'Abrir en pestaña / Open in new tab',
             on: { click: e => { e.stopPropagation(); openLink(card.url); } } }, icon('external-link'))),
         frame, modes,
         h('p', { class: 'cv-web__helper' }, h('span', { lang: 'es', text: 'Para el libro usa un PDF.' }), h('span', { lang: 'en', class: 'ds-bi__en', text: 'For the book, use a PDF.' }))));
     el.append(frameBox);
     applyWebMode(el, card);
+    requestAnimationFrame(() => drawCardInk(el, card));
+  }
+
+  // Full-screen ink lives in frame space (0..1) on the card, so the board card shows the same strokes.
+  function drawCardInk(el, card) {
+    const frame = el.querySelector('.cv-web__frame');
+    const canvas = el.querySelector('.cv-web__ink');
+    if (!frame || !canvas) return;
+    const w = frame.clientWidth, hgt = frame.clientHeight;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.max(1, Math.round(w * dpr));
+    canvas.height = Math.max(1, Math.round(hgt * dpr));
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const color = inkColor();
+    for (const st of card.strokes) {
+      if (!st.points || !st.points.length) continue;
+      drawPolyline(ctx, st.points.map(p => fromFrameSpace(p, { w, h: hgt })), st.color || color, Math.max(1, st.width * w));
+    }
   }
 
   function applyWebMode(el, card) {
@@ -488,7 +531,7 @@
     frame.classList.toggle('is-frozen', card.mode === 'frozen');
     el.querySelectorAll('input[type=radio]').forEach(r => { r.checked = r.value === card.mode; });
     // The document is loaded only once the teacher chooses Interact; Frozen keeps the last painted frame.
-    if (card.mode === 'interact' && !frame.querySelector('iframe')) {
+    if (card.mode === 'interact' && safeWebUrl(card.url) && !frame.querySelector('iframe')) {
       frame.append(h('iframe', { src: card.url, title: 'Tarjeta web / Web page', referrerPolicy: 'no-referrer',
         sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups' }));
     }
@@ -813,6 +856,7 @@
       const p = hit ? worldToObject(hit, world.x, world.y) : world;
       liveStroke = { points: [p], objectId, color: penColor, width: penWidth };
       gesture = { kind: 'ink', pointerId: e.pointerId };
+      strokeBegan();
       queueRedrawInk();
     } else if (action === 'erase_ink') {
       gesture = { kind: 'erase', pointerId: e.pointerId, ids: new Set() };
@@ -825,7 +869,7 @@
   }
 
   function startPinch() {
-    if (liveStroke) { liveStroke = null; queueRedrawInk(); }
+    if (liveStroke) { liveStroke = null; strokeEnded(true); queueRedrawInk(); }
     const pts = [...pointers.values()].filter(p => p.type === 'touch');
     const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
     const r = viewport.getBoundingClientRect();
@@ -919,6 +963,7 @@
     if (g.kind === 'ink') {
       const stroke = liveStroke;
       liveStroke = null;
+      strokeEnded(e.type === 'pointercancel');
       if (e.type !== 'pointercancel') {
         const obj = stroke.objectId ? sg.objects.get(stroke.objectId) : null;
         if (stroke.points.length > 1) {
@@ -987,15 +1032,23 @@
   }
 
   // ---------- Overflow menu ----------
+  // Three ⋮ menus (board, PDF, Tarjeta web), each opened by its rail button; at most one is open.
+  const MENUS = [['btn-more', 'overflow-menu'], ['btn-pdf-menu', 'pdf-menu'], ['btn-web-menu', 'web-menu']];
+  const anyMenuOpen = () => MENUS.some(([, menu]) => !$(menu).hidden);
   function closeMenu() {
-    if (overflowMenu.hidden) return;
-    overflowMenu.hidden = true;
-    $('btn-more').setAttribute('aria-expanded', 'false');
+    for (const [btn, menu] of MENUS) {
+      if ($(menu).hidden) continue;
+      $(menu).hidden = true;
+      $(btn).setAttribute('aria-expanded', 'false');
+    }
   }
-  function toggleMenu() {
-    overflowMenu.hidden = !overflowMenu.hidden;
-    $('btn-more').setAttribute('aria-expanded', String(!overflowMenu.hidden));
-    if (!overflowMenu.hidden) overflowMenu.querySelector('button').focus();
+  function toggleMenu(btnId = 'btn-more', menuId = 'overflow-menu') {
+    const menu = $(menuId);
+    const open = menu.hidden;
+    closeMenu();
+    menu.hidden = !open;
+    $(btnId).setAttribute('aria-expanded', String(open));
+    if (open) menu.querySelector('button').focus();
   }
 
   async function clearBoard() {
@@ -1218,9 +1271,11 @@
       return;
     }
     V.doc = doc; V.proxy = proxy; V.zoom = 1; V.lastGood = doc.currentPage; V.active = doc.currentPage; V.busyBack = false;
+    rails.setFit(true);
     $('pdf-viewer-title').textContent = doc.title;
     $('pdf-total-pages').textContent = String(doc.pageCount);
     pdfEl.hidden = false;
+    closePeeks();
     setViewerTool(V.tool);
     syncViewButtons();
     $('btn-pdf-close').focus();
@@ -1228,8 +1283,10 @@
   }
 
   function syncViewButtons() {
-    $('btn-pdf-view-1').setAttribute('aria-pressed', String(V.view === 1));
-    $('btn-pdf-view-2').setAttribute('aria-pressed', String(V.view === 2));
+    [1, 2].forEach(n => {
+      $(`btn-pdf-view-${n}`).setAttribute('aria-pressed', String(V.view === n));
+      $(`btn-pdf-view-${n}`).setAttribute('aria-checked', String(V.view === n));
+    });
   }
 
   function setPdfView(view) {
@@ -1256,6 +1313,8 @@
     V.token++;
     if (V.renderTask) { try { V.renderTask.cancel(); } catch (e) { /* done */ } }
     V.doc = null; V.proxy = null; V.gesture = null; V.live = null;
+    strokeEnded(true);
+    closeMenu();
     pdfEl.hidden = true;
     for (const obj of sg.objects.values()) if (obj.pdfId === doc.id) refreshObject(obj.id);
     redrawInk();
@@ -1299,12 +1358,11 @@
       const pages = await Promise.all(wanted.map(n => V.proxy.getPage(n)));
       if (token !== V.token) return;
       const bases = pages.map(p => p.getViewport({ scale: 1 }));
-      const gap = bases.length > 1 ? 8 : 0;
-      const availW = Math.max(100, pdfStage.clientWidth - 32 - gap);
-      const availH = Math.max(100, pdfStage.clientHeight - 32);
       const sumW = bases.reduce((a, b) => a + b.width, 0);
       const maxH = Math.max(...bases.map(b => b.height));
-      const scale = Math.min(availW / sumW, availH / maxH) * V.zoom;
+      // Fit uses the whole stage height minus 16 px margins: rails sit beside the page and cost no height (AC17).
+      const fit = pdfFitScale({ viewW: pdfStage.clientWidth, viewH: pdfStage.clientHeight, pageW: sumW / bases.length, pageH: maxH, spread: bases.length, focus: rails.focus });
+      const scale = Math.max(0.1, fit) * V.zoom;
       const dpr = window.devicePixelRatio || 1;
       if (V.renderTask) { try { V.renderTask.cancel(); } catch (e) { /* done */ } }
       const tasks = [];
@@ -1373,6 +1431,7 @@
     if (action === 'draw_ink' && slot) {
       V.live = [pagePoint(e, slot)];
       V.gesture = { kind: 'ink', pointerId: e.pointerId, slot };
+      strokeBegan();
     } else if (action === 'erase_ink' && slot) {
       V.gesture = { kind: 'erase', pointerId: e.pointerId, ids: new Set(), slot };
       pdfErase(pagePoint(e, slot));
@@ -1408,6 +1467,7 @@
     const g = V.gesture;
     if (!g || e.pointerId !== g.pointerId) return;
     V.gesture = null;
+    if (g.kind === 'ink') strokeEnded(e.type === 'pointercancel');
     if (!V.doc) return;
     const n = g.slot ? g.slot.n : V.active;
     if (g.kind === 'ink') {
@@ -1450,6 +1510,7 @@
 
   function pdfZoom(delta) {
     V.zoom = delta === 0 ? 1 : Math.min(3, Math.max(0.5, Number((V.zoom + delta).toFixed(2))));
+    rails.setFit(V.zoom === 1); // a manual zoom is kept when focus mode toggles
     renderPdfPage();
   }
 
@@ -1488,6 +1549,298 @@
     }
   }
 
+  // ---------- Rail chrome: focus mode, edge tabs, in-stroke dim (shared by board, PDF book and Tarjeta web) ----------
+  const peeks = new Map(); // screen element -> { left, right }: rail opened from its edge tab while in focus mode
+
+  function applyChrome() {
+    const focus = rails.focus;
+    app.dataset.focus = String(focus);
+    for (const el of [board, pdfEl, webEl]) {
+      const peek = peeks.get(el) || {};
+      for (const side of ['left', 'right']) {
+        const rail = el.querySelector(`.cv-rail[data-rail="${side}"]`);
+        const tab = el.querySelector(`[data-edge-tab="${side}"]`);
+        const shown = !focus || !!peek[side];
+        rail.hidden = !shown;
+        rail.inert = !shown;
+        tab.hidden = !focus;
+        tab.setAttribute('aria-expanded', String(focus && shown));
+      }
+    }
+    document.querySelectorAll('[data-act="focus-toggle"]').forEach(b => b.setAttribute('aria-pressed', String(focus)));
+  }
+
+  function closePeeks() {
+    let changed = false;
+    for (const [el, peek] of peeks) { if (peek.left || peek.right) changed = true; peeks.set(el, {}); }
+    if (changed) applyChrome();
+  }
+
+  function togglePeek(el, side) {
+    const peek = { ...(peeks.get(el) || {}) };
+    peek[side] = !peek[side];
+    peeks.set(el, peek);
+    applyChrome();
+    const rail = el.querySelector(`.cv-rail[data-rail="${side}"]`);
+    if (peek[side]) { const first = rail.querySelector('button, input'); if (first) first.focus(); }
+  }
+
+  function toggleFocus() {
+    const { refit } = rails.toggleFocus();
+    for (const el of peeks.keys()) peeks.set(el, {});
+    applyChrome();
+    // Only a view still in fit state is re-fitted; a manual zoom keeps its scale. Ink never moves: it is stored in page / frame / world space.
+    if (refit && V.doc) renderPdfPage();
+  }
+
+  function strokeBegan() {
+    rails.beginStroke();
+    closePeeks();
+    app.dataset.inking = String(rails.chromeState().pointerEvents === 'none');
+  }
+  function strokeEnded(cancelled) {
+    if (cancelled) rails.cancelStroke(); else rails.endStroke();
+    app.dataset.inking = String(rails.chromeState().pointerEvents === 'none');
+  }
+
+  // ---------- C7 Tarjeta web full-screen (AC18) ----------
+  // Opens only from the card's «Pantalla completa / Full screen» button. Frozen: our ink over an inert page.
+  // Interact: the page is live and our ink is paused. Blink hosts are Frozen only (AC16). The board camera is untouched.
+  const webEl = $('web-viewer-overlay');
+  const webStage = $('web-stage');
+  const webFrame = $('web-frame');
+  const webInk = $('web-ink');
+  const webCtx = webInk.getContext('2d');
+  const W = { viewer: new WebViewer(sg), card: null, tool: 'pen', zoom: 1, gesture: null, live: null, hidden: new Set(), undo: [], redo: [], returnTo: null, objId: null };
+  const webStrokeId = () => 'wstrk_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+  const webSize = () => ({ w: webFrame.clientWidth || 1, h: webFrame.clientHeight || 1 });
+
+  function openWebViewer(card) {
+    if (!card || !safeWebUrl(card.url)) { refuseUrl(); return; }
+    try { W.viewer.open(card, { explicit: true }); } catch (e) { return; }
+    const obj = Array.from(sg.objects.values()).find(o => o.webCardId === card.id);
+    Object.assign(W, { card, zoom: 1, gesture: null, live: null, hidden: new Set(), undo: [], redo: [], returnTo: document.activeElement, objId: obj ? obj.id : null });
+    closeMenu();
+    webEl.hidden = false;
+    webEl.setAttribute('aria-label', W.viewer.ariaLabel);
+    $('web-viewer-title').textContent = hostOf(card.url);
+    webFrame.style.setProperty('--wv-zoom', '1');
+    webFrame.querySelectorAll('iframe').forEach(f => f.remove());
+    // Frozen still shows the page (inert); Interact makes it live. Hosts that refuse framing get the open-in-tab escape hatch in the ⋮ menu.
+    webFrame.insertBefore(h('iframe', { src: card.url, title: 'Tarjeta web / Web page', referrerPolicy: 'no-referrer',
+      sandbox: 'allow-scripts allow-same-origin allow-forms allow-popups' }), webInk);
+    closePeeks();
+    setWebTool(W.tool);
+    applyWebMode();
+    sizeWebInk();
+    updateWebHistory();
+    $('btn-web-close').focus();
+  }
+
+  function closeWebViewer() {
+    if (!W.card) return;
+    const objId = W.objId;
+    strokeEnded(true);
+    closeMenu();
+    W.viewer.close(); // restores the exact board camera
+    W.card = null; W.gesture = null; W.live = null;
+    webFrame.querySelectorAll('iframe').forEach(f => f.remove());
+    webEl.hidden = true;
+    updateView();
+    if (objId && sg.objects.has(objId)) refreshObject(objId);
+    const back = objId && elements.get(objId) && elements.get(objId).querySelector('[data-act="web-fullscreen"]');
+    const target = back || (W.returnTo && document.contains(W.returnTo) ? W.returnTo : null);
+    if (target) target.focus();
+    W.returnTo = null;
+  }
+
+  function applyWebMode() {
+    if (!W.card) return;
+    const layers = W.viewer.layers();
+    const controls = W.viewer.modeControls();
+    webFrame.classList.toggle('is-frozen', layers.iframePointerEvents === 'none');
+    webFrame.classList.toggle('is-interact', layers.iframePointerEvents === 'auto');
+    webEl.querySelectorAll('[data-web-mode]').forEach(b => {
+      const on = b.dataset.webMode === W.card.mode;
+      b.setAttribute('aria-pressed', String(on));
+      b.setAttribute('aria-checked', String(on));
+      b.disabled = !controls[b.dataset.webMode].enabled;
+    });
+    $('web-status-text').textContent = W.card.mode === 'frozen'
+      ? 'Fija: tinta nuestra, página quieta. / Frozen: our ink, page still.'
+      : 'Interactuar: tinta en pausa. / Interact: ink paused.';
+  }
+
+  function setWebMode(mode) {
+    if (!W.card) return;
+    try { W.viewer.setMode(mode); } catch (err) {
+      toast('Esta página solo se muestra fija', 'This page can only be shown frozen', 'warning', 'triangle-alert');
+      return;
+    }
+    if (W.live) { W.live = null; W.gesture = null; strokeEnded(true); }
+    applyWebMode();
+    redrawWebInk();
+    setDirty(true);
+  }
+
+  function setWebTool(tool) {
+    W.tool = tool;
+    webEl.dataset.tool = tool;
+    webEl.querySelectorAll('[data-web-tool]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.webTool === tool)));
+  }
+
+  function sizeWebInk() {
+    if (!W.card) return;
+    const dpr = window.devicePixelRatio || 1;
+    const { w, h: hgt } = webSize();
+    webInk.width = Math.max(1, Math.round(w * dpr));
+    webInk.height = Math.max(1, Math.round(hgt * dpr));
+    redrawWebInk();
+  }
+
+  function redrawWebInk() {
+    if (!W.card) return;
+    const dpr = window.devicePixelRatio || 1;
+    const { w, h: hgt } = webSize();
+    webCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    webCtx.clearRect(0, 0, w, hgt);
+    const color = inkColor();
+    const px = pts => pts.map(p => fromFrameSpace(p, { w, h: hgt }));
+    for (const st of W.card.strokes) {
+      if (W.hidden.has(st.id) || !st.points.length) continue;
+      drawPolyline(webCtx, px(st.points), st.color || color, Math.max(1, st.width * w));
+    }
+    if (W.live && W.live.length) drawPolyline(webCtx, px(W.live), penColor, penWidth);
+  }
+
+  function updateWebHistory() {
+    $('btn-web-undo').disabled = !W.undo.length;
+    $('btn-web-redo').disabled = !W.redo.length;
+  }
+
+  // Undo/redo of full-screen ink (session only, like the PDF book's).
+  function webApply(action, undoing) {
+    const list = W.card.strokes;
+    if (action.type === 'add') {
+      if (undoing) W.card.strokes = list.filter(st => st.id !== action.stroke.id);
+      else list.push(action.stroke);
+    } else if (undoing) {
+      [...action.removed].sort((a, b) => a.index - b.index).forEach(({ stroke, index }) => list.splice(index, 0, stroke));
+    } else {
+      const ids = new Set(action.removed.map(r => r.stroke.id));
+      W.card.strokes = list.filter(st => !ids.has(st.id));
+    }
+  }
+  function webHistory(dir) {
+    if (!W.card) return;
+    const from = dir < 0 ? W.undo : W.redo;
+    const to = dir < 0 ? W.redo : W.undo;
+    const action = from.pop();
+    if (!action) return;
+    webApply(action, dir < 0);
+    to.push(action);
+    setDirty(true);
+    redrawWebInk();
+    updateWebHistory();
+  }
+  function webCommit(action) { W.undo.push(action); W.redo = []; setDirty(true); updateWebHistory(); }
+
+  async function webClearInk() {
+    if (!W.card) return;
+    if (!W.card.strokes.length) { toast('No hay tinta en esta página', 'No ink on this page', 'info', 'info'); return; }
+    const ok = await confirmDialog({
+      title: '¿Borrar la tinta de la página web? / Clear ink on the web page?',
+      body: 'Solo la tinta; puedes deshacer. / Ink only; you can undo.',
+      confirmLabel: 'Borrar tinta / Clear ink', danger: true
+    });
+    if (!ok || !W.card) return;
+    const removed = W.card.strokes.map((stroke, index) => ({ stroke, index }));
+    W.card.strokes = [];
+    webCommit({ type: 'remove', removed });
+    redrawWebInk();
+  }
+
+  function webPoint(e) {
+    const r = webInk.getBoundingClientRect();
+    return toFrameSpace({ x: e.clientX - r.left, y: e.clientY - r.top }, { w: r.width || 1, h: r.height || 1 });
+  }
+
+  function onWebPointerDown(e) {
+    if (!W.card || W.gesture || W.card.mode !== 'frozen') return;
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    let action = routePointerAction(e, W.tool);
+    if (W.tool === 'select' && action === 'draw_ink') action = 'pan_canvas';
+    if (action === 'select_object') action = 'pan_canvas';
+    if (action === 'draw_ink') {
+      W.live = [webPoint(e)];
+      W.gesture = { kind: 'ink', pointerId: e.pointerId };
+      strokeBegan();
+    } else if (action === 'erase_ink') {
+      W.gesture = { kind: 'erase', pointerId: e.pointerId, ids: new Set() };
+      webErase(webPoint(e));
+    } else {
+      W.gesture = { kind: 'pan', pointerId: e.pointerId, last: { x: e.clientX, y: e.clientY } };
+    }
+  }
+
+  function webErase(p) {
+    const { w, h: hgt } = webSize();
+    const at = fromFrameSpace(p, { w, h: hgt });
+    let changed = false;
+    for (const st of W.card.strokes) {
+      if (W.gesture.ids.has(st.id)) continue;
+      const pts = st.points.map(q => fromFrameSpace(q, { w, h: hgt }));
+      if (strokeNearPoint(pts, at, ERASER_RADIUS_PX + (st.width * w) / 2)) { W.gesture.ids.add(st.id); changed = true; }
+    }
+    if (changed) { W.hidden = new Set(W.gesture.ids); redrawWebInk(); }
+  }
+
+  function onWebPointerMove(e) {
+    const g = W.gesture;
+    if (!g || e.pointerId !== g.pointerId || !W.card) return;
+    if (g.kind === 'ink') { W.live.push(webPoint(e)); redrawWebInk(); }
+    else if (g.kind === 'erase') webErase(webPoint(e));
+    else if (g.kind === 'pan') {
+      webStage.scrollLeft -= e.clientX - g.last.x;
+      webStage.scrollTop -= e.clientY - g.last.y;
+      g.last = { x: e.clientX, y: e.clientY };
+    }
+  }
+
+  function onWebPointerUp(e) {
+    const g = W.gesture;
+    if (!g || e.pointerId !== g.pointerId) return;
+    W.gesture = null;
+    if (g.kind === 'ink') strokeEnded(e.type === 'pointercancel');
+    if (!W.card) return;
+    if (g.kind === 'ink') {
+      const pts = W.live;
+      W.live = null;
+      if (e.type !== 'pointercancel') {
+        const { w } = webSize();
+        const points = pts.length > 1 ? pts : [pts[0], { x: pts[0].x + 0.0001, y: pts[0].y }];
+        const stroke = { id: webStrokeId(), color: penColor, width: penWidth / w, points };
+        W.viewer.addStroke(stroke);
+        webCommit({ type: 'add', stroke });
+      }
+    } else if (g.kind === 'erase') {
+      W.hidden = new Set();
+      if (g.ids.size) {
+        const removed = [];
+        W.card.strokes.forEach((stroke, index) => { if (g.ids.has(stroke.id)) removed.push({ stroke, index }); });
+        W.card.strokes = W.card.strokes.filter(st => !g.ids.has(st.id));
+        webCommit({ type: 'remove', removed });
+      }
+    }
+    redrawWebInk();
+  }
+
+  function webZoom(delta) {
+    W.zoom = delta === 0 ? 1 : Math.min(3, Math.max(0.5, Number((W.zoom + delta).toFixed(2))));
+    webFrame.style.setProperty('--wv-zoom', String(W.zoom));
+    sizeWebInk();
+  }
+
   // ---------- Wiring ----------
   function fillBilingualCopy() {
     document.querySelectorAll('[data-bi]').forEach(el => {
@@ -1523,8 +1876,8 @@
     });
 
     // Tools and add actions
-    document.querySelectorAll('.cv-chrome [data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
-    document.querySelectorAll('.cv-chrome [data-act]').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('#board .cv-rail [data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool)));
+    document.querySelectorAll('#board .cv-rail [data-act]').forEach(b => b.addEventListener('click', () => {
       const act = b.dataset.act;
       if (act === 'add-sticky') addSticky();
       else if (act === 'add-pdf') $('pdf-file-input').click();
@@ -1559,8 +1912,10 @@
     });
 
     // Overflow menu
-    $('btn-more').addEventListener('click', e => { e.stopPropagation(); toggleMenu(); });
-    overflowMenu.addEventListener('click', e => e.stopPropagation());
+    for (const [btn, menu] of MENUS) {
+      $(btn).addEventListener('click', e => { e.stopPropagation(); toggleMenu(btn, menu); });
+      $(menu).addEventListener('click', e => e.stopPropagation());
+    }
     document.addEventListener('click', closeMenu);
     $('menu-clear-board').addEventListener('click', () => { closeMenu(); clearBoard(); });
     $('menu-settings').addEventListener('click', () => { closeMenu(); openSettings(); });
@@ -1577,14 +1932,23 @@
     window.addEventListener('pointercancel', onPointerUp);
     viewport.addEventListener('wheel', onWheel, { passive: false });
     setupDrop();
-    window.addEventListener('resize', () => { sizeInkCanvas(); if (V.doc) renderPdfPage(); });
+    window.addEventListener('resize', () => { sizeInkCanvas(); if (V.doc) renderPdfPage(); sizeWebInk(); });
+    if (window.ResizeObserver) new ResizeObserver(() => sizeWebInk()).observe(webFrame);
+
+    // Rails: focus toggle (every screen), edge tabs (peek the rail while in focus mode)
+    document.querySelectorAll('[data-act="focus-toggle"]').forEach(b => b.addEventListener('click', toggleFocus));
+    for (const el of [board, pdfEl, webEl]) {
+      peeks.set(el, {});
+      el.querySelectorAll('[data-edge-tab]').forEach(t => t.addEventListener('click', () => togglePeek(el, t.dataset.edgeTab)));
+    }
 
     // PDF viewer
     $('btn-pdf-close').addEventListener('click', closeViewer);
+    $('btn-pdf-close-book').addEventListener('click', () => { closeMenu(); closeViewer(); });
     $('btn-pdf-prev').addEventListener('click', () => stepPdfPage(-1));
     $('btn-pdf-next').addEventListener('click', () => stepPdfPage(1));
-    $('btn-pdf-view-1').addEventListener('click', () => setPdfView(1));
-    $('btn-pdf-view-2').addEventListener('click', () => setPdfView(2));
+    $('btn-pdf-view-1').addEventListener('click', () => { closeMenu(); setPdfView(1); });
+    $('btn-pdf-view-2').addEventListener('click', () => { closeMenu(); setPdfView(2); });
     $('pdf-page-input').addEventListener('change', e => goToPdfPage(parseInt(e.target.value, 10)));
     $('pdf-page-input').addEventListener('keydown', e => { if (e.key === 'Enter') goToPdfPage(parseInt(e.target.value, 10)); });
     $('btn-pdf-zoom-in').addEventListener('click', () => pdfZoom(0.25));
@@ -1599,20 +1963,49 @@
     window.addEventListener('pointerup', onPdfPointerUp);
     window.addEventListener('pointercancel', onPdfPointerUp);
 
+    // Tarjeta web full-screen (AC18)
+    $('btn-web-close').addEventListener('click', closeWebViewer);
+    $('btn-web-close-menu').addEventListener('click', closeWebViewer);
+    $('btn-web-open-tab').addEventListener('click', () => { closeMenu(); if (W.card) openLink(W.card.url); });
+    $('btn-web-reload').addEventListener('click', () => {
+      closeMenu();
+      const f = webFrame.querySelector('iframe');
+      if (f && W.card && safeWebUrl(W.card.url)) f.src = W.card.url;
+    });
+    webEl.querySelectorAll('[data-web-mode]').forEach(b => b.addEventListener('click', () => setWebMode(b.dataset.webMode)));
+    webEl.querySelectorAll('[data-web-tool]').forEach(b => b.addEventListener('click', () => {
+      setWebTool(b.dataset.webTool);
+      // Choosing a drawing tool while Interact is on returns to Frozen: one tap back to our ink.
+      if (W.card && W.card.mode === 'interact') setWebMode('frozen');
+    }));
+    $('btn-web-undo').addEventListener('click', () => webHistory(-1));
+    $('btn-web-redo').addEventListener('click', () => webHistory(1));
+    $('btn-web-clear').addEventListener('click', webClearInk);
+    $('btn-web-zoom-in').addEventListener('click', () => webZoom(0.25));
+    $('btn-web-zoom-out').addEventListener('click', () => webZoom(-0.25));
+    $('btn-web-fit').addEventListener('click', () => webZoom(0));
+    webInk.addEventListener('pointerdown', onWebPointerDown);
+    window.addEventListener('pointermove', onWebPointerMove);
+    window.addEventListener('pointerup', onWebPointerUp);
+    window.addEventListener('pointercancel', onWebPointerUp);
+
     // Keyboard
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
         if (!dialogHost.hidden) closeDialog();
-        else if (!overflowMenu.hidden) closeMenu();
+        else if (anyMenuOpen()) closeMenu();
+        else if (!webEl.hidden) closeWebViewer();
         else if (!pdfEl.hidden) closeViewer();
         return;
       }
       const typing = e.target.closest('input, textarea');
       if (typing || !dialogHost.hidden) return;
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); toggleFocus(); return; }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
-        if (!pdfEl.hidden) pdfHistory(e.shiftKey ? 1 : -1); else (e.shiftKey ? $('btn-redo') : $('btn-undo')).click();
-      } else if ((e.key === 'Delete' || e.key === 'Backspace') && sg.selectedObjectId && pdfEl.hidden) {
+        if (!webEl.hidden) webHistory(e.shiftKey ? 1 : -1);
+        else if (!pdfEl.hidden) pdfHistory(e.shiftKey ? 1 : -1); else (e.shiftKey ? $('btn-redo') : $('btn-undo')).click();
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && sg.selectedObjectId && pdfEl.hidden && webEl.hidden) {
         e.preventDefault();
         deleteObject(sg.selectedObjectId);
       }
@@ -1632,6 +2025,7 @@
     updateView();
     afterChange(false);
     updateStatus();
+    applyChrome();
   }
 
   window.addEventListener('DOMContentLoaded', init);

@@ -57,6 +57,13 @@
     webCardHelper: {
       es: 'Para el libro usa un PDF',
       en: 'For the book, use a PDF'
+    },
+    // Tarjeta web full-screen (AC18): never labelled as the book (AC16).
+    webViewer: {
+      label: { es: 'Tarjeta web', en: 'Web page' },
+      fullscreen: { es: 'Pantalla completa', en: 'Full screen' },
+      back: { es: 'Tablero', en: 'Board' },
+      blockedUrl: { es: 'Enlace no permitido: solo http(s)', en: 'Link not allowed: http(s) only' }
     }
   };
 
@@ -499,6 +506,24 @@
     }
   }
 
+  // Card urls come from lesson files and localStorage, not just the add-card dialog: only http(s) may ever reach an iframe or window.open.
+  function safeWebUrl(url) {
+    if (typeof url !== 'string') return null;
+    try {
+      const u = new URL(url.trim());
+      return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : null;
+    } catch (e) { return null; }
+  }
+
+  // --- Interact fence (AC8 / AC16 / AC18): the only place the Blink host literal lives ---
+  const INTERACT_BLOCKED_HOSTS = ['blinklearning.com'];
+  function isInteractAllowed(url) {
+    let host;
+    try { host = new URL(url).hostname.toLowerCase(); } catch (e) { return false; }
+    if (!host) return false;
+    return !INTERACT_BLOCKED_HOSTS.some(blocked => host === blocked || host.endsWith('.' + blocked));
+  }
+
   // --- WebView Card Model (v1.1 / AC13-AC16) ---
   class WebCard {
     constructor(url = '', title = 'Tarjeta web') {
@@ -512,6 +537,7 @@
 
     setMode(mode) {
       if (mode !== 'frozen' && mode !== 'interact') throw new Error('Unknown web card mode: ' + mode);
+      if (mode === 'interact' && !isInteractAllowed(this.url)) throw new Error('Interact is not allowed for this host');
       this.mode = mode;
       return this.mode;
     }
@@ -531,6 +557,109 @@
       this.strokes.push(stroke);
       return stroke;
     }
+  }
+
+
+  // --- Side rails, focus mode, Tarjeta web full-screen (AC17-AC19, tech-plan §4) ---
+  const RAIL_GAP = 16; // px between a rail and the page, and between spread pages
+
+  // UX §5 responsive table. Boundaries inclusive on the lower edge of each band.
+  function railMetrics(viewW) {
+    const edgeTab = { w: 24, h: 72, hit: 56 };
+    if (viewW >= 1600) return { rail: 96, target: 72, labels: 'icon+es+en', mode: 'rails', edgeTab };
+    if (viewW >= 1280) return { rail: 88, target: 64, labels: 'icon+es+en', mode: 'rails', edgeTab };
+    if (viewW >= 800) return { rail: 64, target: 56, labels: 'icon', mode: 'rails', edgeTab };
+    return { rail: 0, target: 48, labels: 'icon', mode: 'compact', edgeTab };
+  }
+
+  // Page scale at fit. Chrome costs no height (rails sit beside the page), so the only vertical
+  // term is the 16 px margin top and bottom; horizontal inset clears the rails unless in focus mode.
+  function pdfFitScale({ viewW, viewH, pageW, pageH, spread = 1, focus = false }) {
+    const rail = railMetrics(viewW).rail;
+    const insetX = focus ? 2 * RAIL_GAP : 2 * (rail + RAIL_GAP);
+    const byWidth = (viewW - insetX - (spread - 1) * RAIL_GAP) / (pageW * spread);
+    const byHeight = (viewH - 2 * RAIL_GAP) / pageH;
+    return Math.min(byWidth, byHeight);
+  }
+
+  // Focus flag (session only, never in the lesson file) and the in-stroke dim of the rails.
+  class RailState {
+    constructor({ storage = null } = {}) {
+      this.storage = storage;
+      this.focus = false;
+      this.fit = true;
+      this.inStroke = false;
+      try { this.focus = !!storage && storage.getItem('cvFocus') === 'true'; } catch (e) { this.focus = false; }
+    }
+
+    toggleFocus() {
+      this.focus = !this.focus;
+      try { if (this.storage) this.storage.setItem('cvFocus', String(this.focus)); } catch (e) { /* storage blocked */ }
+      return { focus: this.focus, refit: this.fit };
+    }
+
+    setFit(isFit) { this.fit = !!isFit; }
+    beginStroke() { this.inStroke = true; }
+    endStroke() { this.inStroke = false; }
+    cancelStroke() { this.inStroke = false; }
+
+    chromeState() {
+      return this.inStroke
+        ? { opacity: 0.3, pointerEvents: 'none', layoutShift: 0 }
+        : { opacity: 1, pointerEvents: 'auto', layoutShift: 0 };
+    }
+  }
+
+  // Full-screen ink is stored in 0..1 of the web frame, so the card on the board shows the same strokes.
+  function toFrameSpace(pt, { w, h }) { return { x: pt.x / w, y: pt.y / h }; }
+  function fromFrameSpace(pt, { w, h }) { return { x: pt.x * w, y: pt.y * h }; }
+
+  function hostOfUrl(url) { try { return new URL(url).host; } catch (e) { return String(url || ''); } }
+
+  // Tarjeta web full-screen (AC18). Owns no camera: it only remembers the board's to restore it.
+  class WebViewer {
+    constructor(sceneGraph) {
+      this.sceneGraph = sceneGraph;
+      this.card = null;
+      this.snapshot = null;
+    }
+
+    get isOpen() { return this.card !== null; }
+
+    open(card, opts) {
+      if (!opts || opts.explicit !== true) throw new Error('Tarjeta web full-screen opens only on an explicit user action');
+      if (!card || !safeWebUrl(card.url)) throw new Error('Tarjeta web url must be http(s)');
+      this.card = card;
+      this.snapshot = { ...this.sceneGraph.viewport };
+      return this;
+    }
+
+    close() {
+      if (!this.card) return;
+      Object.assign(this.sceneGraph.viewport, this.snapshot);
+      this.card = null;
+      this.snapshot = null;
+    }
+
+    get ariaLabel() {
+      const host = this.card ? hostOfUrl(this.card.url) : '';
+      const l = BILINGUAL.webViewer.label;
+      return host ? `${l.es}: ${host} / ${l.en}: ${host}` : `${l.es} / ${l.en}`;
+    }
+
+    setMode(mode) { return this.card.setMode(mode); }
+
+    layers() {
+      return this.card.mode === 'interact'
+        ? { iframePointerEvents: 'auto', inkPointerEvents: 'none' }
+        : { iframePointerEvents: 'none', inkPointerEvents: 'auto' };
+    }
+
+    modeControls() {
+      return { frozen: { enabled: true }, interact: { enabled: isInteractAllowed(this.card.url) } };
+    }
+
+    addStroke(stroke) { return this.card.addStroke(stroke); }
   }
 
   // --- Overlay Chip Cycle Manager (AC9) ---
@@ -596,6 +725,8 @@
       for (const obj of data.objects || []) {
         if (!obj || typeof obj.id !== 'string' || typeof obj.type !== 'string') throw new Error('Invalid lesson object');
       }
+      // Neutralise (not reject) a non-http(s) url so the rest of the lesson still opens.
+      const cleanUrl = u => safeWebUrl(u) ? u : '';
 
       const pdfDocs = (data.pdfDocuments || []).map(d => {
         const doc = new PdfDocument(d.title, d.pageCount);
@@ -607,9 +738,9 @@
       });
 
       const webCards = (data.webCards || []).map(w => {
-        const card = new WebCard(w.url, w.title);
+        const card = new WebCard(cleanUrl(w && w.url), w && w.title);
         card.id = w.id;
-        card.mode = w.mode === 'interact' ? 'interact' : 'frozen';
+        card.mode = w.mode === 'interact' && isInteractAllowed(card.url) ? 'interact' : 'frozen';
         card.strokes = w.strokes || [];
         return card;
       });
@@ -617,7 +748,9 @@
       sceneGraph.viewport = data.viewport ? { ...data.viewport } : { scale: 1, panX: 0, panY: 0 };
       sceneGraph.objects.clear();
       for (const obj of data.objects || []) {
-        sceneGraph.objects.set(obj.id, { rotation: 0, scale: 1, ...obj });
+        const o = { rotation: 0, scale: 1, ...obj };
+        if ((o.type === 'webcard' || o.type === 'link') && 'url' in o) o.url = cleanUrl(o.url);
+        sceneGraph.objects.set(obj.id, o);
       }
       sceneGraph.strokes = [...(data.strokes || [])];
       sceneGraph.undoStack = [];
@@ -709,6 +842,14 @@
     SceneGraph,
     PdfDocument,
     WebCard,
+    isInteractAllowed,
+    safeWebUrl,
+    railMetrics,
+    pdfFitScale,
+    RailState,
+    WebViewer,
+    toFrameSpace,
+    fromFrameSpace,
     OverlayChip,
     LessonSerializer,
     ProbeGate,
