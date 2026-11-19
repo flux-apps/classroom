@@ -82,7 +82,7 @@ describe('G2 — mailto builder (AC21)', () => {
   });
   it('invalid or injected address → error, no url', () => {
     const f = need('buildMailto');
-    for (const to of ['', 'nope', 'a@b', 'a@b.com?cc=evil@x.com', 'a@b.com,evil@x.com', 'a@b.com\r\nBcc: evil@x.com', ' you@example.com x']) {
+    for (const to of ['', 'nope', 'a@b', 'a@example.com?cc=evil@example.net', 'a@example.com,evil@example.net', 'a@example.com\r\nBcc: evil@example.net', ' you@example.com x']) {
       const r = f({ ...base, to });
       assert.ok(r.error, `should reject ${JSON.stringify(to)}`);
       assert.equal(r.url, undefined);

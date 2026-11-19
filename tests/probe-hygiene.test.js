@@ -35,7 +35,7 @@ function trackedFiles(dir) {
 
 describe('AC25 — public-repo hygiene', () => {
   it('scanner self-test: catches an address, a workers.dev host and an account id; allows the two placeholders', () => {
-    assert.deepEqual(scan('mail me@school.org'), ['email:me@school.org']);
+    assert.deepEqual(scan('mail me@example.org'), ['email:me@example.org']);
     assert.deepEqual(scan('https://relay-x.alex.workers.dev/p'), ['workers.dev:relay-x.alex.workers.dev']);
     assert.equal(scan('account_id = "0123456789abcdef0123456789abcdef"').length, 1);
     assert.deepEqual(scan('you@example.com and https://relay.example.com/probe'), []);

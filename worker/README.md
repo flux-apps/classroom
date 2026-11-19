@@ -42,7 +42,7 @@ The free Workers plan is enough (100 000 requests/day, 10 ms CPU per request; th
    | Name | Type | Value |
    |---|---|---|
    | `VISIT_CODE` | Secret | a long random string, for example `openssl rand -base64 24` |
-   | `ALLOWED_ORIGIN` | Text | the probe's origin, scheme and host only, for example `https://probe.example.com` (placeholder) |
+   | `ALLOWED_ORIGIN` | Text | the probe's origin, scheme and host only: `<probe origin>` (placeholder, set it in the dashboard) |
    | `RELAY_TO` | Text | your verified Email Routing destination, for example `you@example.com` (placeholder) |
    | `RELAY_FROM` | Text | a sender address on your own Email Routing domain |
    | `MAX_BYTES` | Text | optional, default `102400` |
