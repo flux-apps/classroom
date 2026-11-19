@@ -45,9 +45,21 @@
             <span class="ds-bi__en" lang="en">Reset</span>
           </span>
         </button>
+        <button type="button" class="ds-btn ds-btn--board ds-btn--secondary" id="btn-send">
+          <span class="ic ic-upload ic--md" aria-hidden="true"></span>
+          <span class="ds-bi">
+            <span class="ds-bi__es" lang="es">Enviar</span>
+            <span class="ds-bi__en" lang="en">Send</span>
+          </span>
+        </button>
       </div>
     </div>
   </header>
+
+  <!-- Banner stack: received share (H6), imported send settings, another window active -->
+  <div id="share-banner" hidden></div>
+  <div id="import-banner" hidden></div>
+  <div id="writer-banner" hidden></div>
 
   <!-- P5 Restore banner (shown when a previous visit was found in localStorage) -->
   <div id="restore-banner" hidden></div>
@@ -64,6 +76,9 @@
 
   <!-- Skip sheet, completeness gate (P6) and reset confirm render here -->
   <div id="modal-root"></div>
+
+  <!-- P7 surface takeover: the three H surfaces and the trial dock render here (page mode on <body>) -->
+  <div class="probe-h-root" id="surface-root" hidden></div>
 
   <!-- Reads the dynamic viewport height for the F keyboard check; never visible -->
   <div class="probe-dvh" id="dvh-probe" aria-hidden="true"></div>

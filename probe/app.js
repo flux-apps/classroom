@@ -3,7 +3,8 @@
 (function () {
   'use strict';
 
-  const { BILINGUAL, classifyHost, ProbeStore, normalizePointerEvent } = window.ProbeCore;
+  const Core = window.ProbeCore;
+  const { BILINGUAL, classifyHost, ProbeStore, normalizePointerEvent } = Core;
 
   const WDK_URL = 'https://api.smarttech.com/lib/smartboard-1.3.11-min.js';
   const LS_PREV = 'smart-board-probe:prev';
@@ -17,6 +18,7 @@
   const store = new ProbeStore(null); // storage is attached once the restore banner is resolved (AC7)
   let ls = null;
   try { ls = window.localStorage; } catch (_) { ls = null; }
+  let settings = Core.createSettings(ls); // device settings (recipient, relay URL, visit code): own key, outlive Reset (AC28)
 
   let activeId = 'A';
   let pendingRestore = null; // { raw, state } | { raw, error: true }
@@ -36,7 +38,12 @@
     dvh: document.getElementById('dvh-probe'),
     export: document.getElementById('btn-export'),
     copyLog: document.getElementById('btn-copy-log'),
-    reset: document.getElementById('btn-reset')
+    reset: document.getElementById('btn-reset'),
+    send: document.getElementById('btn-send'),
+    shareBanner: document.getElementById('share-banner'),
+    importBanner: document.getElementById('import-banner'),
+    writerBanner: document.getElementById('writer-banner'),
+    surface: document.getElementById('surface-root')
   };
 
   /* ------------------------------------------------------------------ helpers */
@@ -102,11 +109,6 @@
     }
   }
 
-  function stamp(d) {
-    const x = d || new Date();
-    return `${x.getFullYear()}${pad2(x.getMonth() + 1)}${pad2(x.getDate())}-${pad2(x.getHours())}${pad2(x.getMinutes())}`;
-  }
-
   /* ------------------------------------------------------------------ markup builders */
 
   const STATUS_UI = {
@@ -161,7 +163,10 @@
     const any = Object.values(state.scenarios).some((s) => s && s.status && s.status !== 'idle');
     const trials = state.scenarios.D && state.scenarios.D.trials ? Object.values(state.scenarios.D.trials).some((t) => t.status !== 'idle') : false;
     const o = state.operator || {};
-    return any || trials || Boolean(o.gxModel || o.browsers);
+    const of = state.overlayFollow;
+    const answered = of ? Boolean(of.h4) || Object.values(of.h5 || {}).some((r) => r && r.answer) : false;
+    const sent = Array.isArray(state.delivery) && state.delivery.length > 0;
+    return any || trials || answered || sent || Boolean(o.gxModel || o.browsers);
   }
 
   function parseSaved(raw) {
@@ -327,6 +332,8 @@
     const conf = confidenceWord(h.confidence);
     const secs = store.state.activeSeconds || 0;
     const clock = `${pad2(Math.floor(secs / 60))}:${pad2(secs % 60)}`;
+    const hDone = hDoneCount();
+    const out = outCount();
     el.chips.innerHTML = [
       `<span class="ds-chip probe-chip probe-chip--info" aria-label="host">${ic('layout-grid', 'md')}${bi('host: ' + esc(h.classification), 'confianza ' + conf[0] + ' · confidence ' + conf[1])}</span>`,
       `<span class="ds-chip probe-chip ${secure ? 'probe-chip--ok' : 'probe-chip--warn'}">${ic(secure ? 'lock' : 'triangle-alert', 'md')}${bi(esc(served) + (secure ? ' · contexto seguro' : ' · sin contexto seguro'), esc(served) + (secure ? ' · secure context' : ' · not a secure context'))}</span>`,
@@ -334,7 +341,11 @@
       `<span class="ds-chip probe-chip probe-chip--count">${ic('clipboard-list', 'md')}${bi('A–E terminados', 'A–E finished')}<strong class="probe-count">${done}/5</strong></span>`,
       ev.complete
         ? `<span class="ds-chip probe-chip probe-chip--ok" role="status">${ic('circle-check', 'md')}${bi('Evidencia completa', 'evidence.complete: yes')}</span>`
-        : `<span class="ds-chip probe-chip probe-chip--warn" role="status">${ic('triangle-alert', 'md')}${bi('Evidencia incompleta', 'evidence.complete: no')}</span>`
+        : `<span class="ds-chip probe-chip probe-chip--warn" role="status">${ic('triangle-alert', 'md')}${bi('Evidencia incompleta', 'evidence.complete: no')}</span>`,
+      Core.isHComplete(store.state)
+        ? `<span class="ds-chip probe-chip probe-chip--ok probe-chip--sep">${ic('circle-check', 'md')}${bi('H completo: sí', 'H complete: yes')}</span>`
+        : `<span class="ds-chip probe-chip probe-chip--sep">${ic('hand', 'md')}${bi('H · Overlay sigue', 'H · Overlay follows')}<strong class="probe-count">${hDone}/3</strong></span>`,
+      `<span class="ds-chip probe-chip probe-chip--sep">${ic('upload', 'md')}${bi('salida', 'out')}<strong class="probe-count">${out}/2</strong></span>`
     ].join('');
   }
 
@@ -353,7 +364,9 @@
 
   function stepDone(step) {
     if (step.num === 1) return sc('A').status !== 'idle';
+    if (step.num === '1b') return store.state.delivery.length > 0 || ['B', 'C', 'D', 'E'].some((id) => sc(id).status !== 'idle');
     if (step.num === 2) { const o = store.state.operator; return o.overlayAtStart !== 'unknown' && o.freezeAtStart !== 'unknown'; }
+    if (step.num === 9) return outCount() >= 2;
     return step.targets.every((id) => isTerminalStatus(sc(id).status));
   }
 
@@ -374,6 +387,7 @@
   acts.step = (t) => {
     const step = BILINGUAL.steps.find((s) => String(s.num) === t.dataset.step);
     if (!step) return;
+    if (step.num === '1b') { openSend(); return; }
     selectScenario(step.targets[0], true);
   };
 
@@ -399,7 +413,7 @@
       const hole = m.id === 'D' && ['D3', 'D4', 'D6'].some(holeTrial) && s.status !== 'idle';
       const canSkip = !isTerminalStatus(s.status) || s.status === 'na';
       const letter = m.optional ? '' : `<span class="probe-card__letter">${m.id}</span>`;
-      const extra = m.id === 'D' ? `<span class="ds-badge">${trialsDone()}/6</span>` : '';
+      const extra = m.id === 'D' ? `<span class="ds-badge">${trialsDone()}/6</span>` : m.id === 'H' ? `<span class="ds-badge ds-badge--info">${hDoneCount()}/3</span><span class="ds-badge ds-badge--warning">${ic('clock', 'sm')}Antes de F / Before F</span>` : '';
       const warn = m.warnEs ? `<span class="ds-badge ds-badge--warning">${ic('triangle-alert', 'sm')}${m.warnEs} / ${m.warnEn}</span>` : '';
       return `<li class="probe-card${hole ? ' probe-card--hole' : ''}" aria-current="${m.id === activeId}">
         <button type="button" class="probe-card__main" data-act="select" data-id="${m.id}"${s.status === 'running' ? ' aria-busy="true"' : ''}>
@@ -409,8 +423,8 @@
         <button type="button" class="ds-iconbtn ds-iconbtn--board" data-act="skip" data-id="${m.id}" aria-label="Saltar… / Skip… ${m.id}" title="Saltar… / Skip…"${canSkip ? '' : ' disabled'}>${ic('arrow-right', 'lg')}</button>
       </li>`;
     };
-    const main = BILINGUAL.scenarios.filter((m) => !m.optional).map(card).join('');
-    const optional = BILINGUAL.scenarios.filter((m) => m.optional).map(card).join('');
+    const main = BILINGUAL.scenarios.filter((m) => !m.optional && m.card !== false).map(card).join('');
+    const optional = BILINGUAL.scenarios.filter((m) => m.optional && m.card !== false).map(card).join('');
     el.list.innerHTML = `<div class="ds-card ds-card--outline probe-summary">
         <h2 class="ds-card__title">${biInline('Barra de evidencia', 'Evidence bar')}</h2>
         <div class="ds-progress"><div class="ds-progress__track" role="progressbar" aria-valuemin="0" aria-valuemax="5" aria-valuenow="${done}" aria-label="A–E"><div class="ds-progress__fill" data-pct="${done * 20}"></div></div><span>${done}/5</span></div>
@@ -468,7 +482,7 @@
   function openModal(html, opts) {
     closeModal(true);
     const o = opts || {};
-    el.modal.innerHTML = `<div class="probe-modal"><div class="ds-scrim" data-act="modal-backdrop"><div class="ds-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">${html}</div></div></div>`;
+    el.modal.innerHTML = `<div class="probe-modal${o.sheet ? ' probe-modal--sheet' : ''}"><div class="ds-scrim" data-act="modal-backdrop"><div class="ds-dialog" role="dialog" aria-modal="true" aria-labelledby="modal-title">${html}</div></div></div>`;
     modalState = { returnFocus: document.activeElement, onClose: o.onClose || null };
     const first = o.focus ? el.modal.querySelector(o.focus) : el.modal.querySelector('button, input, textarea');
     if (first) first.focus();
@@ -564,7 +578,8 @@
     const items = missingList(ev.missing);
     const body = `<p>${biInline('evidence.complete: no — falta A–E terminal o D3/D4/D6; no es evidencia GX', 'evidence.complete: no — A–E not terminal or D3/D4/D6 missing; not GX evidence')}</p>
       <p class="t-small">${biInline('Faltan', 'Missing')}:</p><ul class="probe-list-plain">${items}</ul>
-      <p class="t-small">${biInline('Este JSON no es evidencia GX. Skip-D + sbPresent:false no es un gate.', 'This JSON is not GX evidence. Skip-D + sbPresent:false is not a gate.')}</p>`;
+      <p class="t-small">${biInline('Este JSON no es evidencia GX. Skip-D + sbPresent:false no es un gate.', 'This JSON is not GX evidence. Skip-D + sbPresent:false is not a gate.')}</p>
+      <p class="t-caption">overlayFollow.complete: ${Core.isHComplete(store.state) ? 'yes' : 'no'}</p>`;
     const foot = `${btn('modal-close', 'Volver', 'Back', { variant: 'secondary' })}${btn('gate-export', 'Exportar de todos modos · evidence.complete: false', 'Export anyway · evidence.complete: false')}`;
     openModal(dialogShell('evidence.complete: no', 'evidence.complete: no', body, foot), { focus: '[data-act="modal-close"].ds-btn' });
   }
@@ -598,7 +613,7 @@
 
   function downloadExport() {
     const payload = store.exportPayload();
-    const name = `probe-${stamp(new Date(payload.exportedAt))}.json`;
+    const name = Core.exportFilename(new Date(payload.exportedAt), 'json');
     try {
       const blob = new Blob([safeJson(payload, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
@@ -632,8 +647,8 @@
 
   function exportClicked() {
     store.updateEvidence();
-    if (store.state.evidence.complete) downloadExport();
-    else openGate();
+    if (Core.needsIncompleteWarning('export', store.state.evidence)) openGate();
+    else downloadExport();
   }
 
   /* ------------------------------------------------------------------ pane routing */
@@ -1710,8 +1725,11 @@
       const p = s.payload || {};
       const ev = store.state.evidence;
       const smoke = p.smoke;
-      const summary = BILINGUAL.scenarios.filter((m) => !m.optional && m.id !== 'G').map((m) => `<li class="probe-sumrow">${bi(m.id + ' · ' + m.es, m.en)}${statusBadge(sc(m.id).status)}</li>`).join('');
-      return `<p class="probe-lead"><span lang="es">Comprueba el almacenamiento, exporta el JSON y copia el registro. Deja la pestaña abierta hasta que el archivo esté en Descargas.</span><span class="en" lang="en">Check storage, export the JSON and copy the log. Leave the tab open until the file is in Downloads.</span></p>
+      const summary = BILINGUAL.scenarios.filter((m) => !m.optional && m.id !== 'G' && m.card !== false).map((m) => `<li class="probe-sumrow">${bi(m.id + ' · ' + m.es, m.en)}${statusBadge(sc(m.id).status)}</li>`).join('');
+      const lastExport = p.exports && p.exports.length ? p.exports[p.exports.length - 1] : null;
+      return `<h3 class="probe-s__title" id="save-title">① ${biInline('Guardar', 'Save')}</h3>
+        <p class="probe-lead"><span lang="es">Comprueba el almacenamiento, exporta el JSON y copia el registro. Deja la pestaña abierta hasta que el archivo esté en Descargas.</span><span class="en" lang="en">Check storage, export the JSON and copy the log. Leave the tab open until the file is in Downloads.</span></p>
+        ${lastExport ? `<p class="probe-note"><span class="probe-mono">${esc(lastExport.filename)} · ${hhmm(lastExport.at)}</span></p>` : ''}
         <div class="probe-row">
           ${btn('g-export', 'Exportar JSON', 'Export JSON', { icon: 'download' })}
           ${btn('g-copy-json', 'Copiar JSON', 'Copy JSON', { variant: 'secondary', icon: 'clipboard-list' })}
@@ -1729,7 +1747,7 @@
           ['Cuota', 'Quota', smoke.quota ? esc(safeJson(smoke.quota)) : 'n/a']
         ]) : ''}
         <ul class="probe-checks" role="list">${summary}</ul>
-        ${gShowJson ? `<label class="ds-field"><span class="ds-field__label"><span lang="es">JSON de exportación (copia manual)</span><span class="en" lang="en">Export JSON (manual copy)</span></span><textarea class="ds-input probe-json" readonly rows="14">${esc(exportJsonText())}</textarea></label>` : ''}`;
+        ${gShowJson ? `<label class="ds-field"><span class="ds-field__label"><span lang="es">JSON de exportación (copia manual)</span><span class="en" lang="en">Export JSON (manual copy)</span></span><textarea class="ds-input probe-json" readonly rows="14">${esc(exportJsonText())}</textarea></label>` : ''}${sendHtml()}`;
     }
   };
   acts['g-export'] = exportClicked;
@@ -1743,6 +1761,935 @@
     say(`Almacenamiento: localStorage ${smoke.localStorage.ok}, indexedDB ${smoke.indexedDB.ok}`, `Storage: localStorage ${smoke.localStorage.ok}, indexedDB ${smoke.indexedDB.ok}`);
     afterChange();
   };
+
+  /* ------------------------------------------------------------------ H: Overlay follows content (spec v0.4 AC12–AC18, UX §16) */
+
+  const H_TRIALS = {
+    H1a: { surface: 'S-doc', es: 'Desplazar la página', en: 'Scroll the page', doEs: 'desplaza la página con el dedo', doEn: 'scroll the page with a finger' },
+    H1b: { surface: 'S-box', es: 'Desplazar la caja', en: 'Scroll the box', doEs: 'desplaza la caja con el dedo', doEn: 'scroll the box with a finger' },
+    H2: { surface: 'S-doc', es: 'Zoom de página (pellizco)', en: 'Pinch-zoom the page', doEs: 'haz zoom con dos dedos (pellizco)', doEn: 'pinch-zoom the page' },
+    H3: { surface: 'S-xform', es: 'Arrastrar o zoom (CSS)', en: 'Drag or zoom (CSS)', doEs: 'arrastra con un dedo o usa +/−', doEn: 'drag with one finger or use +/−' }
+  };
+  const H_WORD = { follows: ['sigue', 'follows'], stays: ['se queda', 'stays'], partial: ['parcial', 'partial'], scales: ['escala', 'scales'], 'n/a': ['n/a', 'n/a'] };
+  const H4_CHIPS = [['Visor del tablero', 'Board viewer'], ['Archivos / Files', 'Files'], ['Compartir / Share', 'Share'], ['Otra', 'Other']];
+  const H5_ROWS = [
+    ['H5a', '¿Overlay se cierra con un botón?', 'Does Overlay close with a button?', 'cuál botón / which button'],
+    ['H5b', '¿Overlay se cierra con un gesto?', 'Does Overlay close with a gesture?', 'cuál gesto / which gesture'],
+    ['H5c', '¿Overlay se cierra al devolver el lápiz a la bandeja?', 'Does Overlay close when the pen goes back in the tray?', ''],
+    ['H5d', '¿Se borra la tinta al cerrar Overlay?', 'Is the ink erased when Overlay closes?', 'se guarda / save prompt / kept'],
+    ['H5e', '¿Overlay ofrece Compartir o Guardar?', 'Does Overlay offer Share or Save?', 'cuál / which'],
+    ['H5f', '¿La sonda instalada aparece en la lista de Compartir?', 'Is the installed probe in the Share list?', ''],
+    ['H5g', '¿Ajustes de GX tiene opción de lápiz / Overlay automático?', 'Does GX Settings have a pen-pickup / Overlay auto-launch setting?', 'ruta y valores / path and values']
+  ];
+  const SHARE_KEY = 'smart-board-probe:share';
+
+  const hLive = {
+    open: null, spec: null, draft: null, recorder: null, recorderError: false, running: false, t0: 0, elapsed: 0, timerId: 0,
+    side: 'right', sheet: 'peek', err: null, saved: false, still: false, summary: null, live: { scroll: 0, vvMin: 1, vvMax: 1 },
+    lastTop: {}, tapTimes: [], recOffs: [], offs: [], paneScroll: 0, xf: { scale: 1, tx: 0, ty: 0 }, install: null, h6Na: false
+  };
+  const hTrial = (id) => store.state.overlayFollow.trials[id];
+  const hStatusOf = (t) => (Core.isHTrialTerminal(t) ? (t.verdict === 'n/a' ? 'na' : 'pass') : 'idle');
+  const hWord = (v) => H_WORD[v] || [String(v), String(v)];
+  const hDoneCount = () => ['H1a', 'H1b', 'H3'].filter((id) => Core.isHTrialTerminal(hTrial(id)) && hTrial(id).overlayOn === true).length;
+  const hhmm = (iso) => { const d = new Date(iso); return isNaN(d) ? '--:--' : `${pad2(d.getHours())}:${pad2(d.getMinutes())}`; };
+  const fmtSize = (n) => (n < 1024 ? `${n} B` : n < 1048576 ? `${Math.round(n / 1024)} KB` : `${(n / 1048576).toFixed(1)} MB`);
+  const sumCounts = (o) => Object.values(o || {}).reduce((a, v) => a + (typeof v === 'number' ? v : sumCounts(v)), 0);
+  const hTimelines = () => Core.H_IDS.reduce((acc, id) => acc.concat(Array.isArray(hTrial(id).timeline) ? hTrial(id).timeline : []), []);
+
+  function hCount(c, key, type) {
+    const v = c && c[key];
+    if (typeof v === 'number') return v;
+    if (!v) return 0;
+    return type ? (v[type] || 0) : sumCounts(v);
+  }
+
+  // facts, not colours: counts exact, pointermove stored sampled
+  function hCountsLine(c, scrollSum, vvText) {
+    const ptr = (type) => ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].reduce((a, k) => a + hCount(c, k, type), 0);
+    const scroll = scrollSum == null ? `scroll ${hCount(c, 'scroll')}` : `scrollΔ ${scrollSum}`;
+    return `blur ${hCount(c, 'blur')} · focus ${hCount(c, 'focus')} · vis ${hCount(c, 'visibilitychange')} · pen ${ptr('pen')} · touch ${ptr('touch')} · mouse ${ptr('mouse')} · ${scroll}${vvText ? ' · vv ' + vvText : ''}`;
+  }
+
+  /* ---- H pane (P3) */
+
+  function hTrialRow(id) {
+    const m = H_TRIALS[id];
+    const t = hTrial(id);
+    const w = hWord(t.verdict);
+    const result = t.verdict
+      ? `<span class="ds-badge${t.verdict === 'n/a' ? '' : ' ds-badge--info'}">${biInline(w[0], w[1])}</span>${t.overlayOn ? `<span class="ds-badge ds-badge--warning">${ic('triangle-alert', 'sm')}Overlay ON</span>` : ''}${t.recalled ? `<span class="ds-badge">${biInline('de memoria', 'recalled')}</span>` : ''}${t.truncated ? `<span class="ds-badge ds-badge--warning">${biInline('truncado', 'truncated')}</span>` : ''}`
+      : '';
+    const counts = t.counts ? `<span class="probe-mono">${esc(hCountsLine(t.counts))}</span>` : '';
+    return `<li class="ds-card probe-h-trial"><span class="probe-h-trial__id">${id}</span>
+      <div><div>${bi(`${m.surface} · ${m.es}`, m.en)}</div><div class="probe-h-trial__sub">${result}${counts}${t.notes ? `<span>${esc(t.notes.length > 60 ? t.notes.slice(0, 59) + '…' : t.notes)}</span>` : ''}</div></div>
+      <div class="probe-h-trial__acts">${statusBadge(hStatusOf(t))}${btn('h-open', 'Abrir', 'Open', { icon: 'play', attrs: `data-tid="${id}"` })}${btn('h-skip', 'Saltar…', 'Skip…', { variant: 'ghost', attrs: `data-tid="${id}"` })}</div></li>`;
+  }
+
+  function h5Row(r) {
+    const of = store.state.overlayFollow;
+    const a = of.h5[r[0]];
+    const na = r[0] === 'H5f' && of.h5.H5e.answer === 'no';
+    const opts = [['yes', 'sí', 'yes'], ['no', 'no', 'no'], ['unknown', 'no sé', 'unknown']]
+      .map((o) => radio('h5-' + r[0], o[0], a.answer === o[0], na, o[1], o[2], `data-chg="h5-ans" data-id="${r[0]}"`)).join('');
+    return `<div class="probe-h-h5${na ? ' probe-h-h5--na' : ''}"><div>${bi(`${r[0]} · ${r[1]}`, r[2])}${na ? `<span class="probe-note">${biInline('no aplica', 'n/a')}</span>` : ''}</div>
+      <div class="probe-h-opts" role="radiogroup" aria-label="${r[0]}">${opts}</div>
+      <input class="ds-input" type="text" data-chg="h5-note" data-id="${r[0]}" value="${esc(a.note)}" placeholder="${esc(r[3])}"${na ? ' readonly' : ''} autocomplete="off" aria-label="${r[0]} nota / note"></div>`;
+  }
+
+  function hMechanismHtml() {
+    const of = store.state.overlayFollow;
+    const mech = Core.computeOverlayMechanism(of.trials);
+    const known = ['follows', 'stays', 'partial'];
+    const basis = ['H1a', 'H1b', 'H3'].map((id) => { const t = of.trials[id]; const w = t && Core.isHTrialTerminal(t) ? hWord(t.verdict) : null; return `${id} ${w ? w[0] + ' / ' + w[1] : '—'}`; }).join(' · ');
+    const missing = ['H1a', 'H1b', 'H3'].filter((id) => !known.includes(of.trials[id].verdict));
+    const h2 = of.trials.H2;
+    const h2w = h2 && Core.isHTrialTerminal(h2) ? hWord(h2.verdict) : null;
+    const sigs = Core.computeOverlaySignals(of.taps, hTimelines());
+    const kinds = Array.from(new Set(sigs.reduce((acc, s) => acc.concat(s.events.map((e) => e.kind)), [])));
+    const gx = store.state.host.classification === 'gx-android';
+    return `<div class="probe-h-mech" role="status">
+        <div class="probe-h-mech__line">${biInline('Mecanismo', 'Mechanism')}: <span class="probe-h-mech__val">${mech}</span></div>
+        <div class="probe-h-mech__line">${biInline('Basado en', 'Based on')}: ${esc(basis)} · GX: ${gx ? 'sí / yes' : 'no'}</div>
+        ${mech === 'inconclusive' ? `<div class="probe-h-mech__line">${biInline('falta', 'missing')}: ${missing.join(' ')}</div>` : ''}
+        <div class="probe-h-mech__line">${biInline('Zoom (H2): refina solo el zoom', 'Zoom (H2): refines zoom only')}: ${h2w ? esc(h2w[0] + ' / ' + h2w[1]) : '—'}</div>
+        <div class="probe-h-mech__line">${biInline('Señales de página cerca de «Overlay abierto»', 'Page signals near “Overlay is open”')}: ${of.taps.length ? `${kinds.length ? esc(kinds.join(', ')) : biInline('ninguna', 'none')} (${of.taps.length} taps)` : biInline('ninguna', 'none')}</div>
+        <div class="probe-h-mech__line">${biInline('H completo', 'H complete')}: ${Core.isHComplete(store.state) ? 'sí / yes' : 'no'} · ${biInline('No cambia evidence.complete', 'Does not change evidence.complete')}</div>
+      </div>`;
+  }
+
+  const h6Files = () => { const p = sc('H6').payload; return p && Array.isArray(p.files) ? p.files : []; };
+
+  function hShareHtml() {
+    const installed = window.matchMedia('(display-mode: standalone)').matches;
+    const files = h6Files();
+    const s = sc('H6');
+    const a = sc('A').payload;
+    const vp = a && a.viewport ? `${a.viewport.width}×${a.viewport.height}` : `${window.innerWidth}×${window.innerHeight}`;
+    let body;
+    if (files.length) {
+      body = files.map((f) => (f.error
+        ? `<div class="probe-h-recv">${notice('No se pudo leer el archivo', 'The file could not be read', 'circle-alert')}</div>`
+        : `<div class="probe-h-recv"><div class="probe-h-thumb" aria-hidden="true">${esc(f.mime || '?')}</div><div>
+            <p class="probe-mono">${esc(f.mime)} · ${fmtSize(f.byteSize)} · ${f.width ? `${f.width}×${f.height}` : '—'} · ${biInline('transparencia', 'has alpha')}: ${f.hasAlpha === true ? 'sí / yes' : f.hasAlpha === false ? 'no' : 'desconocido / unknown'}</p>
+            <p class="probe-note">${biInline('Viewport de la página', 'Page viewport')}: <span class="probe-mono">${esc(vp)}</span></p>
+            <p class="probe-note">${biInline('El archivo no se guarda ni se envía', 'The file is neither stored nor sent')}</p></div></div>`)).join('');
+    } else if (s.status === 'na') {
+      body = `<p class="probe-note">n/a — ${esc(s.notes)}</p>`;
+    } else if (!installed) {
+      body = `<p class="probe-note"><span lang="es">Instala la sonda: menú ⋮ de Chrome → Instalar aplicación.</span><span class="en" lang="en">Install the probe: Chrome ⋮ menu → Install app.</span></p>${hLive.install ? `<div class="probe-row">${btn('h6-install', 'Instalar', 'Install', { icon: 'download' })}</div>` : ''}`;
+    } else {
+      body = `<p class="probe-note"><span lang="es">Abre Overlay, escribe, y elige Compartir → Sonda.</span><span class="en" lang="en">Open Overlay, write, then choose Share → Probe.</span></p>
+        <div class="probe-row">${btn('h6-na-toggle', 'No llegó nada · n/a…', 'Nothing arrived · n/a…', { variant: 'ghost' })}</div>
+        ${hLive.h6Na ? `<div class="probe-block">${field(['Motivo (obligatorio)', 'Reason (required)'], '', '<input class="ds-input" type="text" id="h6-na-reason" autocomplete="off">')}<div class="probe-row">${btn('h6-na-confirm', 'Marcar n/a', 'Mark n/a')}</div></div>` : ''}`;
+    }
+    return `<div class="probe-block"><p class="probe-h-rule t-caption">${biInline('Si hay tiempo', 'If time')}</p>
+      <h3 class="probe-block__title">H6 · ${biInline('Compartir → sonda', 'Share → probe')}</h3>${body}</div>`;
+  }
+
+  PANES.H = {
+    html() {
+      const of = store.state.overlayFollow;
+      const v = of.trials.H1a.variant || {};
+      const variantOpts = [['follows', 'sigue', 'follows'], ['stays', 'se queda', 'stays'], ['partial', 'parcial', 'partial']]
+        .map((o) => radio('hvar', o[0], v.verdict === o[0], false, o[1], o[2], 'data-chg="h-variant-verdict"')).join('');
+      const chips = H4_CHIPS.map((c) => `<button type="button" class="ds-chip" data-act="h4-chip" data-text="${esc(c[0])}">${esc(c[0])}</button>`).join('');
+      return `<p class="probe-lead"><span lang="es">Antes: Overlay ON, lápiz de bandeja. Marca con el lápiz y mueve el contenido con el dedo. Esta página no dibuja: cualquier marca es de Overlay.</span><span class="en" lang="en">Before: Overlay ON, tray pen. Write a mark with the pen, then move the content with a finger. This page draws nothing: any mark is Overlay’s.</span></p>
+        <h3 class="probe-block__title">${biInline('Ensayos', 'Trials')} <span class="ds-badge">${hDoneCount()}/3</span></h3>
+        <ul class="probe-h-trials" role="list">${Core.H_IDS.map(hTrialRow).join('')}</ul>
+        <div class="probe-block"><h3 class="probe-block__title">${biInline('Otra web larga en Chrome (opcional)', 'Any long site in Chrome (optional)')}</h3>
+          ${field(['Sitio', 'Site'], '', `<input class="ds-input" type="text" data-chg="h-variant-site" value="${esc(v.site || '')}" autocomplete="off">`)}
+          <div class="probe-opts" role="radiogroup">${variantOpts}</div></div>
+        <div class="probe-block"><h3 class="probe-block__title">H4 · ${biInline('Respuestas', 'Answers')}</h3>
+          <label class="ds-field"><span class="ds-field__label"><span lang="es">¿Qué app del tablero mantuvo la tinta sobre un PDF/imagen? ¿Cómo se abrió el archivo? ¿Siguió al desplazar, al zoom, o a ambos?</span><span class="en" lang="en">Which board app kept ink on a PDF/image? How was the file opened? Did it follow scroll, zoom, or both?</span></span><textarea class="ds-input" rows="3" data-chg="h4-text">${esc(of.h4)}</textarea></label>
+          <div class="probe-opts">${chips}</div></div>
+        <div class="probe-block"><h3 class="probe-block__title">H5 · ${biInline('Ciclo de vida de Overlay', 'Overlay lifecycle')}</h3>${H5_ROWS.map(h5Row).join('')}</div>
+        ${hShareHtml()}
+        ${hMechanismHtml()}`;
+    }
+  };
+
+  acts['h4-text'] = (t) => store.setH4(t.value);
+  acts['h4-chip'] = (t) => { const cur = store.state.overlayFollow.h4; store.setH4(cur ? cur + ' · ' + t.dataset.text : t.dataset.text); renderPane(true); };
+  acts['h5-ans'] = (t) => { const id = t.dataset.id; store.setH5(id, t.value, store.state.overlayFollow.h5[id].note); say(`${id}: ${t.value}`, `${id}: ${t.value}`); afterChange(); };
+  acts['h5-note'] = (t) => store.setH5Note(t.dataset.id, t.value);
+  acts['h-variant-site'] = (t) => { const v = hTrial('H1a').variant || {}; store.setHVariant(t.value, v.verdict); };
+  acts['h-variant-verdict'] = (t) => { const v = hTrial('H1a').variant || {}; store.setHVariant(v.site || '', t.value); };
+  acts['h-skip'] = (t) => {
+    const id = t.dataset.tid;
+    const body = `<p>${biInline(`Saltar ${id}: ${esc(H_TRIALS[id].es)}`, `Skip ${id}: ${esc(H_TRIALS[id].en)}`)}</p>
+      <label class="ds-field"><span class="ds-field__label"><span lang="es">Motivo (obligatorio)</span><span class="en" lang="en">Reason (required)</span></span><textarea class="ds-input" id="h-skip-reason" rows="3" placeholder="no se abrió Overlay / Overlay did not open"></textarea>
+        <span class="ds-field__error" id="h-skip-error" hidden>${ic('circle-alert', 'sm')}<span>Escribe un motivo. / Write a reason.</span></span></label>`;
+    const foot = `${btn('modal-close', 'Cancelar', 'Cancel', { variant: 'ghost' })}${btn('h-skip-confirm', 'Marcar n/a', 'Mark n/a', { attrs: `data-tid="${id}"` })}`;
+    openModal(dialogShell('Saltar ensayo', 'Skip trial', body, foot), { focus: '#h-skip-reason' });
+  };
+  acts['h-skip-confirm'] = (t) => {
+    const reason = (document.getElementById('h-skip-reason').value || '').trim();
+    if (!reason) { document.getElementById('h-skip-error').hidden = false; return; }
+    store.setHTrial(t.dataset.tid, { verdict: 'n/a', overlayOn: false, notes: reason, timeline: [], truncated: false, recalled: false });
+    say(`${t.dataset.tid}: n/a — ${reason}`, `${t.dataset.tid}: n/a — ${reason}`);
+    closeModal(true);
+    afterChange();
+  };
+  acts['h6-na-toggle'] = () => { hLive.h6Na = !hLive.h6Na; renderPane(true); };
+  acts['h6-na-confirm'] = () => {
+    const reason = (document.getElementById('h6-na-reason').value || '').trim();
+    if (!reason) { document.getElementById('h6-na-reason').setAttribute('aria-invalid', 'true'); return; }
+    store.setScenarioResult('H6', 'na', null, reason);
+    hLive.h6Na = false;
+    say(`H6: n/a — ${reason}`, `H6: n/a — ${reason}`);
+    afterChange();
+  };
+  acts['h6-install'] = async () => {
+    const prompt = hLive.install;
+    if (!prompt) return;
+    hLive.install = null;
+    try { await prompt.prompt(); } catch (_) { /* dismissed */ }
+    if (activeId === 'H') renderPane(true);
+  };
+  acts['h-open'] = (t) => hOpen(t.dataset.tid);
+
+  /* ---- received share (H6): the installed PWA window gets a redirect with metadata only; the file is already gone */
+
+  let pendingShare = [];
+
+  function readShareList() {
+    try { const raw = ls && ls.getItem(SHARE_KEY); const list = raw ? JSON.parse(raw) : []; return Array.isArray(list) ? list.slice(-10) : []; } catch (_) { return []; }
+  }
+  function saveShareList(list) {
+    if (!ls) return;
+    try { if (list.length) ls.setItem(SHARE_KEY, JSON.stringify(list)); else ls.removeItem(SHARE_KEY); } catch (_) { /* quota */ }
+  }
+
+  function takeShareFromUrl() {
+    let packed = null;
+    try { packed = new URLSearchParams(window.location.search).get('share'); } catch (_) { return; }
+    if (!packed) return;
+    let rec;
+    try {
+      const meta = JSON.parse(atob(packed.replace(/-/g, '+').replace(/_/g, '/')));
+      rec = meta && meta.error
+        ? { error: 'unreadable', at: new Date().toISOString() }
+        : { mime: String(meta.mime || '').slice(0, 60), byteSize: Number(meta.byteSize) || 0, width: meta.width == null ? null : Number(meta.width), height: meta.height == null ? null : Number(meta.height), hasAlpha: typeof meta.hasAlpha === 'boolean' ? meta.hasAlpha : null, at: new Date().toISOString() };
+    } catch (_) {
+      rec = { error: 'unreadable', at: new Date().toISOString() };
+    }
+    pendingShare = pendingShare.concat([rec]);
+    saveShareList(pendingShare);
+    try { window.history.replaceState(null, '', window.location.pathname + window.location.hash); } catch (_) { /* ignore */ }
+  }
+
+  function renderShareBanner() {
+    if (!pendingShare.length) { el.shareBanner.hidden = true; el.shareBanner.innerHTML = ''; return; }
+    const last = pendingShare[pendingShare.length - 1];
+    const what = last.error
+      ? ['No se pudo leer el archivo recibido', 'The received file could not be read']
+      : [`Archivo recibido: ${esc(last.mime)} ${last.width ? last.width + '×' + last.height : ''} · ${fmtSize(last.byteSize)}`, `File received: ${esc(last.mime)} ${last.width ? last.width + '×' + last.height : ''} · ${fmtSize(last.byteSize)}`];
+    const canRestore = pendingRestore && !pendingRestore.error;
+    el.shareBanner.hidden = false;
+    el.shareBanner.innerHTML = `<div class="ds-banner" role="status">${ic('image', 'lg')}<div class="ds-banner__text"><span lang="es">${what[0]}</span><span class="ds-banner__en" lang="en">${what[1]}</span></div><div class="probe-banner-actions">${canRestore ? btn('share-restore', 'Restaurar visita y añadir a H6', 'Restore the visit and add to H6', { variant: 'secondary' }) : ''}${btn('share-add', canRestore ? 'Añadir a visita vacía' : 'Añadir a la visita', canRestore ? 'Add to an empty visit' : 'Add to the visit', { variant: 'secondary' })}${btn('share-ignore', 'Ignorar', 'Ignore', { variant: 'secondary' })}</div></div>`;
+  }
+
+  // H6 never persists the file: only metadata is appended, and a restore never overwrites H state.
+  function h6Append(list) {
+    const p = Object.assign({ files: [] }, sc('H6').payload);
+    p.files = (p.files || []).concat(list.map((r) => { const o = Object.assign({}, r); o.receivedAt = o.at; delete o.at; return o; }));
+    const ok = p.files.some((f) => !f.error);
+    sc('H6').notes = ok ? '' : 'No se pudo leer el archivo / the file could not be read';
+    store.setScenarioResult('H6', ok ? 'pass' : 'na', p);
+    say(`H6: ${list.length} archivo(s) recibido(s) (solo metadatos)`, `H6: ${list.length} file(s) received (metadata only)`);
+  }
+  function clearShare() { pendingShare = []; saveShareList([]); renderShareBanner(); }
+
+  acts['share-restore'] = () => {
+    const list = pendingShare;
+    acts['restore-yes']();
+    claimWriter();
+    h6Append(list);
+    clearShare();
+    refresh();
+    selectScenario('H');
+  };
+  acts['share-add'] = () => { const list = pendingShare; h6Append(list); clearShare(); refresh(); selectScenario('H'); };
+  acts['share-ignore'] = () => { clearShare(); say('Archivo recibido ignorado', 'Received file ignored'); };
+
+  /* ---- single writer: the share opens the installed PWA window; two windows must not overwrite each other silently */
+
+  const WRITER_KEY = 'smart-board-probe:writer';
+  const windowId = Math.random().toString(36).slice(2, 10);
+  let writerLost = false;
+
+  function claimWriter() {
+    if (ls) { try { ls.setItem(WRITER_KEY, windowId); } catch (_) { /* ignore */ } }
+    writerLost = false;
+    renderWriterBanner();
+  }
+  function renderWriterBanner() {
+    if (!writerLost) { el.writerBanner.hidden = true; el.writerBanner.innerHTML = ''; return; }
+    el.writerBanner.hidden = false;
+    el.writerBanner.innerHTML = `<div class="ds-banner" role="status">${ic('triangle-alert', 'lg')}<div class="ds-banner__text"><span lang="es">Otra ventana activa: esta ventana ya no guarda la visita.</span><span class="ds-banner__en" lang="en">Another window is active: this window no longer saves the visit.</span></div><div class="probe-banner-actions">${btn('writer-take', 'Tomar el control', 'Take control', { variant: 'secondary' })}</div></div>`;
+  }
+  acts['writer-take'] = () => { store.storage = ls; store.persist(); claimWriter(); say('Esta ventana vuelve a guardar la visita', 'This window saves the visit again'); };
+
+  /* ---- P7: surface takeover (page mode on <body>), the three surfaces and the trial dock */
+
+  const hRowH = () => (window.matchMedia('(max-width: 799px)').matches ? 56 : 72);
+
+  function hRowsHtml(spec) {
+    const count = Math.max(spec.rows, Math.ceil((6 * window.innerHeight) / hRowH()));
+    let out = '';
+    for (let n = 1; n <= count; n++) {
+      const num = String(n).padStart(3, '0');
+      const cls = `probe-h-row${n % 5 === 0 ? ' probe-h-row--5' : ''}${n === spec.targetRow ? ' probe-h-row--target' : ''}`;
+      const label = n % 20 === 0 ? `<span class="probe-h-band">═══ ${num} ═══</span>` : `<span class="probe-h-num">${num}</span>`;
+      const extra = (n === 1 ? '<span class="probe-h-start">▲ START</span><span class="probe-h-cross">+</span>' : '')
+        + (n === spec.targetRow ? '<span class="probe-h-ring"></span><span class="probe-h-mark">ESCRIBE AQUÍ / WRITE HERE ◀</span>' : '');
+      out += `<div class="${cls}" data-n="${n}"><span class="probe-h-ruler">${num}</span>${label}${extra}</div>`;
+    }
+    return out;
+  }
+
+  // The surfaces draw nothing: no canvas, no ink handler. Any mark on screen is Overlay's (AC18).
+  function hSurfaceHtml(spec) {
+    const rows = hRowsHtml(spec);
+    if (spec.id === 'S-doc') return `<div class="probe-h-surf probe-h-surf--doc" id="h-surf">${rows}</div>`;
+    if (spec.id === 'S-box') return `<div class="probe-h-surf probe-h-surf--box" id="h-surf"><span class="probe-h-boxlabel">caja / box</span><div class="probe-h-box" id="h-box">${rows}</div></div>`;
+    return `<div class="probe-h-surf probe-h-surf--xform" id="h-surf"><div class="probe-h-xview" id="h-xview"><div class="probe-h-xrows" id="h-xrows">${rows}</div></div>
+      <div class="probe-h-xui" role="group" aria-label="Zoom">
+        <button type="button" class="ds-iconbtn ds-iconbtn--board" data-act="h-xz" data-delta="-0.25" aria-label="Alejar / Zoom out">${ic('minus', 'xl')}</button>
+        <span class="probe-h-xzoom" id="h-xzoom" role="status">100%</span>
+        <button type="button" class="ds-iconbtn ds-iconbtn--board" data-act="h-xz" data-delta="0.25" aria-label="Acercar / Zoom in">${ic('plus', 'xl')}</button>
+        ${btn('h-x150', 'Zoom 150 %', 'Zoom 150%', { variant: 'secondary', icon: 'zoom-in' })}
+        ${btn('h-xreset', 'Restablecer', 'Reset view', { variant: 'secondary', icon: 'rotate-cw' })}
+      </div></div>`;
+  }
+
+  function hXformApply() {
+    const rows = document.getElementById('h-xrows');
+    if (!rows) return;
+    const v = hLive.xf;
+    rows.style.transform = `translate(${v.tx}px, ${v.ty}px) scale(${v.scale})`;
+    setText('h-xzoom', Math.round(v.scale * 100) + '%');
+  }
+  function hXformScale(next) {
+    const view = document.getElementById('h-xview');
+    if (!view) return;
+    const v = hLive.xf;
+    const s = Math.min(4, Math.max(0.25, Number(next.toFixed(2))));
+    const cx = view.clientWidth / 2;
+    const cy = view.clientHeight / 2;
+    const px = (cx - v.tx) / v.scale;
+    const py = (cy - v.ty) / v.scale;
+    v.scale = s; v.tx = cx - px * s; v.ty = cy - py * s;
+    hXformApply();
+  }
+  acts['h-xz'] = (t) => hXformScale(hLive.xf.scale + Number(t.dataset.delta));
+  acts['h-x150'] = () => hXformScale(1.5);
+  acts['h-xreset'] = () => { hLive.xf = { scale: 1, tx: 0, ty: 0 }; hXformApply(); };
+
+  const hTimerText = () => { const s = Math.floor((hLive.running ? Date.now() - hLive.t0 : hLive.elapsed) / 1000); return `${Math.floor(s / 60)}:${pad2(s % 60)}`; };
+
+  function hLiveLine() {
+    const snap = hLive.recorder ? hLive.recorder.snapshot() : { counts: {} };
+    const vv = window.visualViewport;
+    return hCountsLine(snap.counts, hLive.live.scroll, vv ? vv.scale.toFixed(2) : 'n/a');
+  }
+
+  function hSummaryHtml(snap) {
+    const total = sumCounts(snap.counts);
+    const e = snap.entries;
+    const clock = (t) => { const d = new Date(t); return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`; };
+    const sigs = Core.computeOverlaySignals(hLive.tapTimes, e);
+    const kinds = Array.from(new Set(sigs.reduce((acc, s) => acc.concat(s.events.map((x) => x.kind)), [])));
+    return `<div class="probe-h-sum">
+        <p class="probe-mono">${esc(hCountsLine(snap.counts, hLive.live.scroll, `${hLive.live.vvMin.toFixed(2)}–${hLive.live.vvMax.toFixed(2)}`))}</p>
+        <p class="probe-mono">${e.length ? `${clock(e[0].t)} → ${clock(e[e.length - 1].t)} · ` : ''}${e.length} ${biInline('entradas (pointermove muestreado)', 'entries (pointermove sampled)')}</p>
+        <p>${hLive.tapTimes.length} × ${biInline('Overlay abierto ahora', 'Overlay is open now')} · ${biInline('señales', 'signals')}: ${kinds.length ? esc(kinds.join(', ')) : biInline('ninguna', 'none')}</p>
+        ${snap.truncated ? `<p class="probe-h-warnline">2000/2000 — ${biInline('se descartan los siguientes', 'further entries dropped')}</p>` : ''}
+        ${total === 0 ? `<p><strong>${biInline('0 también es dato', '0 is data too')}</strong></p>` : ''}
+      </div>`;
+  }
+
+  function hDockHtml() {
+    const d = hLive.draft;
+    const tid = hLive.open;
+    const m = H_TRIALS[tid];
+    const locked = !d.overlayOn;
+    const naOk = d.overlayOn || (d.notes || '').trim().length > 0;
+    const radios = Core.H_VERDICTS[tid].map((v) => {
+      const w = hWord(v);
+      return radio('hv', v, d.verdict === v, v === 'n/a' ? !naOk : locked, w[0], w[1], `data-chg="h-verdict" data-fk="hv-${v}" aria-describedby="h-reason"`);
+    }).join('');
+    const running = hLive.running;
+    return `<aside class="probe-h-dock" id="h-dock" role="region" aria-label="Panel del ensayo / Trial panel" data-side="${hLive.side}" data-sheet="${hLive.sheet}" data-running="${running}">
+      <div class="probe-h-dock__head"><h2 class="probe-h-dock__title">${tid} · ${hLive.spec.id}<small>${esc(m.es)} / ${esc(m.en)}</small></h2>
+        <button type="button" class="ds-iconbtn probe-h-sheetbtn" data-act="h-sheet" aria-label="Más controles / More controls" aria-expanded="${hLive.sheet === 'full'}">${ic('maximize', 'lg')}</button></div>
+      <p class="probe-h-chip" id="h-zoomchip" hidden>${ic('triangle-alert', 'sm')}Zoom ≠ 1× — pellizca para volver / pinch back</p>
+      <div class="probe-h-dock__core">
+        ${check('hov', d.overlayOn, false, 'Overlay estaba ON', 'Overlay was ON', 'data-chg="h-overlay" data-fk="h-ov"')}
+        ${running ? '' : btn('h-start', 'Empezar', 'Start', { icon: 'play' })}
+        <span class="probe-h-timer" id="h-timer">${hTimerText()}</span>
+        ${running ? btn('h-overlay-open', 'Overlay abierto ahora', 'Overlay is open now', { variant: 'secondary' }) + btn('h-stop', 'Parar', 'Stop', { variant: 'danger', icon: 'x' }) : ''}
+      </div>
+      <div class="probe-h-dock__more">
+        <p class="probe-h-instr"><span lang="es">Escribe una marca corta con el lápiz de bandeja junto a la fila 08. Luego ${m.doEs}.</span><span class="en" lang="en">Write a short mark with the tray pen beside row 08. Then ${m.doEn}.</span></p>
+        ${running ? `<p class="probe-h-count" id="h-counters" aria-live="off">${esc(hLiveLine())}</p>` : ''}
+        ${hLive.summary ? hSummaryHtml(hLive.summary) : ''}
+        ${hLive.recorderError ? `<p class="probe-h-warnline">${biInline('No se pudo grabar: el veredicto sigue permitido', 'Could not record: the verdict is still allowed')}</p>` : ''}
+        <p class="probe-h-warnline"><span lang="es">Si Overlay bloquea los botones: recuerda lo que viste, ciérralo, y marca el veredicto después. Anota cómo se cierra en H5.</span><span class="en" lang="en">If Overlay blocks the buttons: remember what you saw, close it, then record the verdict. Note how it closes in H5.</span></p>
+        <fieldset class="probe-h-verdict"><legend>${biInline('Veredicto', 'Verdict')}</legend><div class="probe-h-rads" role="radiogroup">${radios}</div>
+          <p class="probe-h-reason" id="h-reason">${locked ? biInline('Marca «Overlay estaba ON» para elegir', 'Tick “Overlay was ON” to choose') : ''}</p></fieldset>
+        <label class="ds-field"><span class="ds-field__label"><span lang="es">Notas</span><span class="en" lang="en">Notes</span></span><textarea class="ds-input" rows="2" data-chg="h-notes" data-fk="h-notes">${esc(d.notes)}</textarea></label>
+        <p class="probe-h-err" id="h-err" role="alert">${hLive.err ? biInline(hLive.err[0], hLive.err[1]) : ''}${hLive.saved ? biInline('Guardado', 'Saved') : ''}</p>
+        <div class="probe-h-dock__foot">${btn('h-save', 'Guardar', 'Save')}${btn('h-exit', 'Salir', 'Exit', { variant: 'secondary', icon: 'arrow-left' })}</div>
+        <div class="probe-h-dock__foot">${btn('h-side', '⇄ Cambiar lado', 'Swap side', { variant: 'ghost' })}</div>
+      </div>
+      <p class="probe-h-sr" id="h-announce" role="status" aria-live="polite"></p>
+    </aside>`;
+  }
+
+  function hRenderDock() {
+    const dock = document.getElementById('h-dock');
+    if (!dock) return;
+    const a = document.activeElement;
+    const inDock = a && dock.contains(a);
+    const fk = inDock ? (a.dataset.fk ? `[data-fk="${a.dataset.fk}"]` : a.dataset.act ? `[data-act="${a.dataset.act}"]` : null) : null;
+    const holder = document.createElement('div');
+    holder.innerHTML = hDockHtml().trim();
+    dock.replaceWith(holder.firstElementChild);
+    hTrack();
+    if (fk) { const n = document.querySelector('#h-dock ' + fk); if (n && !n.disabled) n.focus({ preventScroll: true }); }
+  }
+
+  const hAnnounce = (text) => setText('h-announce', text);
+
+  // AC18: the dock follows the visual viewport when it is zoomed; the chip is the visible fallback.
+  function hTrack() {
+    const dock = document.getElementById('h-dock');
+    if (!dock) return;
+    const vv = window.visualViewport;
+    const p = Core.dockPlacement(vv ? { scale: vv.scale, offsetLeft: vv.offsetLeft, offsetTop: vv.offsetTop, width: vv.width, height: vv.height } : { scale: 1 });
+    const chip = document.getElementById('h-zoomchip');
+    if (chip) chip.hidden = !p.showZoomBadge;
+    if (p.mode === 'fixed') { delete dock.dataset.track; return; }
+    const root = document.documentElement;
+    const wide = window.matchMedia('(min-width: 1280px)').matches;
+    const tx = wide ? (hLive.side === 'left' ? p.offsetLeft : p.offsetLeft + p.width - root.clientWidth) : p.offsetLeft;
+    const ty = wide ? p.offsetTop : p.offsetTop + p.height - root.clientHeight;
+    dock.style.setProperty('--probe-h-tx', tx + 'px');
+    dock.style.setProperty('--probe-h-ty', ty + 'px');
+    dock.style.setProperty('--probe-h-ts', String(1 / p.scale));
+    dock.dataset.track = '1';
+  }
+
+  function hBindSurface() {
+    const on = (t, type, fn, o) => { t.addEventListener(type, fn, o); hLive.offs.push(() => t.removeEventListener(type, fn, o)); };
+    if (window.visualViewport) { on(window.visualViewport, 'resize', hTrack); on(window.visualViewport, 'scroll', hTrack); }
+    const view = document.getElementById('h-xview');
+    if (view) {
+      let last = null;
+      on(view, 'pointerdown', (e) => { view.setPointerCapture(e.pointerId); last = { x: e.clientX, y: e.clientY }; });
+      on(view, 'pointermove', (e) => {
+        if (!last) return;
+        hLive.xf.tx += e.clientX - last.x;
+        hLive.xf.ty += e.clientY - last.y;
+        last = { x: e.clientX, y: e.clientY };
+        hXformApply();
+      });
+      on(view, 'pointerup', () => { last = null; });
+      on(view, 'pointercancel', () => { last = null; });
+      on(view, 'wheel', (e) => { e.preventDefault(); hXformScale(hLive.xf.scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1)); }, { passive: false });
+    }
+  }
+
+  function hOpen(tid) {
+    stopAllActivity();
+    const spec = Core.surfaceSpec(Core.SURFACE_FOR_TRIAL[tid]);
+    const t = hTrial(tid);
+    Object.assign(hLive, {
+      open: tid, spec, draft: { overlayOn: t.overlayOn === true, verdict: t.verdict, notes: t.notes || '' }, recorder: null, recorderError: false,
+      running: false, elapsed: 0, err: null, saved: false, still: false, summary: null, live: { scroll: 0, vvMin: 1, vvMax: 1 },
+      lastTop: {}, tapTimes: [], recOffs: [], offs: [], paneScroll: el.pane.scrollTop, xf: { scale: 1, tx: 0, ty: 0 }
+    });
+    hLive.sheet = window.matchMedia('(min-width: 1280px)').matches ? 'full' : 'peek';
+    document.body.dataset.surface = spec.id;
+    document.documentElement.dataset.surface = spec.id;
+    el.surface.dataset.side = hLive.side;
+    el.surface.hidden = false;
+    el.surface.innerHTML = hSurfaceHtml(spec) + hDockHtml();
+    window.scrollTo(0, 0);
+    hBindSurface();
+    hTrack();
+    say(`${tid}: ensayo abierto (${spec.id})`, `${tid}: trial opened (${spec.id})`);
+  }
+
+  function hDetach() { hLive.recOffs.forEach((f) => f()); hLive.recOffs = []; }
+
+  // AC14: timestamped timeline with no operator effort. Events inside the dock are ignored, so "no events between Start and
+  // Stop" (recalled) means Overlay really took the finger events away from the content.
+  function hAttach() {
+    const rec = Core.createTrialRecorder({ cap: 2000 });
+    hLive.recorder = rec;
+    hLive.live = { scroll: 0, vvMin: 1, vvMax: 1 };
+    hLive.lastTop = {};
+    hLive.tapTimes = [];
+    hLive.recOffs = [];
+    const on = (t, type, fn, o) => { t.addEventListener(type, fn, o); hLive.recOffs.push(() => t.removeEventListener(type, fn, o)); };
+    const add = (evt) => { evt.t = Date.now(); rec.add(evt); };
+    const inDock = (e) => { const d = document.getElementById('h-dock'); return Boolean(d && e.target && d.contains(e.target)); };
+    on(window, 'blur', () => add({ kind: 'blur' }));
+    on(window, 'focus', () => add({ kind: 'focus' }));
+    on(document, 'visibilitychange', () => add({ kind: 'visibilitychange', state: document.visibilityState }));
+    ['pointerdown', 'pointermove', 'pointerup', 'pointercancel'].forEach((type) => on(document, type, (e) => {
+      if (inDock(e)) return;
+      add({ kind: type, pointerType: e.pointerType || 'unknown', pointerId: e.pointerId, x: Math.round(e.clientX), y: Math.round(e.clientY) });
+    }, { capture: true, passive: true }));
+    on(document, 'scroll', (e) => {
+      const t = e.target;
+      let target = null;
+      let top = 0;
+      if (t === document) { target = 'S-doc'; top = Math.round(document.scrollingElement.scrollTop); }
+      else if (t && t.id === 'h-box') { target = 'S-box'; top = Math.round(t.scrollTop); }
+      if (!target) return;
+      hLive.live.scroll += Math.abs(top - (hLive.lastTop[target] || 0));
+      hLive.lastTop[target] = top;
+      add({ kind: 'scroll', target, scrollTop: top });
+    }, { capture: true, passive: true });
+    const vv = window.visualViewport;
+    if (vv) {
+      let lastVv = 0;
+      const onVv = () => {
+        hLive.live.vvMin = Math.min(hLive.live.vvMin, vv.scale);
+        hLive.live.vvMax = Math.max(hLive.live.vvMax, vv.scale);
+        const now = Date.now();
+        if (now - lastVv < 50) return;
+        lastVv = now;
+        add({ kind: 'vv', scale: Number(vv.scale.toFixed(3)), offsetLeft: Math.round(vv.offsetLeft), offsetTop: Math.round(vv.offsetTop), width: Math.round(vv.width), height: Math.round(vv.height) });
+      };
+      on(vv, 'resize', onVv);
+      on(vv, 'scroll', onVv);
+    }
+  }
+
+  function hTick() {
+    setText('h-timer', hTimerText());
+    setText('h-counters', hLiveLine());
+    if (!hLive.still && Date.now() - hLive.t0 >= 90000) { hLive.still = true; hAnnounce('Sigue grabando / Still recording'); }
+  }
+
+  acts['h-start'] = () => {
+    if (hLive.running) return;
+    hLive.recorderError = false;
+    try { hAttach(); } catch (e) {
+      hDetach();
+      hLive.recorder = null;
+      hLive.recorderError = true;
+      say(`${hLive.open}: no se pudo grabar`, `${hLive.open}: could not record`, 'warn');
+    }
+    hLive.running = true;
+    hLive.t0 = Date.now();
+    hLive.summary = null;
+    hLive.saved = false;
+    hLive.timerId = setInterval(hTick, 250);
+    say(`${hLive.open}: grabación iniciada`, `${hLive.open}: recording started`);
+    hRenderDock();
+    hAnnounce('Grabando / Recording');
+  };
+
+  function hStop() {
+    if (!hLive.running) return;
+    hLive.running = false;
+    clearInterval(hLive.timerId);
+    hLive.elapsed = Date.now() - hLive.t0;
+    hDetach();
+    hLive.summary = hLive.recorder ? hLive.recorder.snapshot() : null;
+    hLive.sheet = 'full';
+    say(`${hLive.open}: grabación detenida`, `${hLive.open}: recording stopped`);
+    hRenderDock();
+    hAnnounce('Detenido / Stopped');
+  }
+  acts['h-stop'] = hStop;
+
+  acts['h-overlay-open'] = () => {
+    if (!hLive.running) return;
+    const t = Date.now();
+    store.addOverlayTap(t);
+    hLive.tapTimes.push(t);
+    say(`${hLive.open}: Overlay abierto ahora (${hLive.tapTimes.length})`, `${hLive.open}: Overlay is open now (${hLive.tapTimes.length})`);
+    hAnnounce(`Overlay abierto ahora: ${hLive.tapTimes.length}`);
+  };
+  acts['h-overlay'] = (t) => { hLive.draft.overlayOn = t.checked; hLive.err = null; hLive.saved = false; hRenderDock(); };
+  acts['h-verdict'] = (t) => { hLive.draft.verdict = t.value; hLive.err = null; hLive.saved = false; };
+  acts['h-notes'] = (t) => {
+    hLive.draft.notes = t.value;
+    const na = document.querySelector('#h-dock input[value="n/a"]');
+    if (na) na.disabled = !(hLive.draft.overlayOn || t.value.trim());
+  };
+  acts['h-side'] = () => { hLive.side = hLive.side === 'right' ? 'left' : 'right'; el.surface.dataset.side = hLive.side; hRenderDock(); };
+  acts['h-sheet'] = () => { hLive.sheet = hLive.sheet === 'full' ? 'peek' : 'full'; hRenderDock(); };
+
+  acts['h-save'] = () => {
+    const d = hLive.draft;
+    const tid = hLive.open;
+    const check = Core.validateTrialVerdict(tid, d.verdict, { overlayOn: d.overlayOn, notes: d.notes });
+    if (!check.ok) {
+      hLive.err = check.error === 'na-needs-reason' ? ['n/a necesita un motivo en las notas', 'n/a needs a reason in the notes'] : check.error === 'bad-verdict' ? ['Elige un veredicto', 'Choose a verdict'] : ['Marca «Overlay estaba ON» para elegir', 'Tick “Overlay was ON” to choose'];
+      hRenderDock();
+      return;
+    }
+    if (hLive.running) hStop();
+    const fin = Core.finalizeTrial(tid, { verdict: d.verdict, overlayOn: d.overlayOn, notes: d.notes }, hLive.recorder);
+    if (hLive.recorderError) fin.timeline = null;
+    fin.counts = hLive.recorder ? hLive.recorder.snapshot().counts : {};
+    store.setHTrial(tid, fin);
+    const w = hWord(d.verdict);
+    say(`${tid}: veredicto ${w[0]}${fin.recalled ? ' (de memoria)' : ''}`, `${tid}: verdict ${w[1]}${fin.recalled ? ' (recalled)' : ''}`);
+    hLive.err = null;
+    hLive.saved = true;
+    hRenderDock();
+    hAnnounce('Guardado / Saved');
+    refresh();
+  };
+
+  function hClose() {
+    if (!hLive.open) return;
+    if (hLive.running) { hLive.running = false; clearInterval(hLive.timerId); hDetach(); }
+    hLive.offs.forEach((f) => f());
+    hLive.offs = [];
+    hLive.open = null;
+    delete document.body.dataset.surface;
+    delete document.documentElement.dataset.surface;
+    el.surface.hidden = true;
+    el.surface.innerHTML = '';
+    window.scrollTo(0, 0);
+    selectScenario('H');
+    el.pane.scrollTop = hLive.paneScroll;
+    refresh();
+  }
+  acts['h-exit'] = hClose;
+
+  /* ------------------------------------------------------------------ G2: send results (spec v0.4 AC19–AC24, AC27, AC28; UX §17) */
+
+  const sLive = {
+    sharing: false, relay: null, relayTimer: 0, pendingPayload: null, mailHint: false, mailSeen: false, mailError: '', status: null,
+    sumOpen: false, settingsOpen: false, notOfferedOpen: false, testDismissed: false, setErr: '', editTo: false
+  };
+  const HANDED = ['shared', 'opened', 'sent'];
+
+  // salida n/2: (1) exported to Downloads, (2) handed off or sent at least once. Informational only.
+  function outCount() {
+    const g = sc('G').payload;
+    const exported = g && Array.isArray(g.exports) && g.exports.length > 0 ? 1 : 0;
+    return exported + (store.state.delivery.some((d) => HANDED.includes(d.outcome)) ? 1 : 0);
+  }
+
+  const detectFile = () => { try { return new File(['probe'], 'probe.json.txt', { type: 'text/plain' }); } catch (_) { return null; } };
+  const currentChannels = () => Core.offeredChannels({ nav: navigator, file: detectFile(), settings: settings.load() });
+
+  function sendContext() {
+    const x = store.exportPayload();
+    return { x, json: safeJson(x, 2), summary: Core.buildSummary(x), date: String(x.finishedAt).slice(0, 10) };
+  }
+  const subjectOf = (c) => `Probe ${c.x.hostClassification} ${c.date} complete=${c.x.evidence.complete}`;
+  const renderSendIfActive = () => { if (activeId === 'G' && !hLive.open) renderPane(true); };
+
+  function openSend() {
+    selectScenario('G');
+    const h = document.getElementById('send-title');
+    if (h) { h.scrollIntoView({ block: 'start' }); h.focus({ preventScroll: true }); }
+  }
+  el.send.addEventListener('click', openSend);
+
+  const OUT_ICON = { ok: 'circle-check', warn: 'info', neutral: 'minus', err: 'circle-alert' };
+  const outcomeClass = (o) => (o === 'shared' || o === 'sent' ? 'ok' : o === 'opened' ? 'warn' : o === 'cancelled' ? 'neutral' : 'err');
+
+  function outcomeLine(channel) {
+    if (channel === 'share' && sLive.sharing) return `<div class="probe-s-ch__out probe-s-ch__out--run">${ic('clock', 'sm')}${biInline('esperando a la app…', 'waiting for the app…')}</div>`;
+    if (channel === 'relay' && sLive.relay) return `<div class="probe-s-ch__out probe-s-ch__out--run">${ic('clock', 'sm')}${biInline('enviando…', 'sending…')} <span class="probe-mono" id="s-relay-count" aria-live="off">0/15 s</span>${btn('s-relay-cancel', 'Cancelar', 'Cancel', { variant: 'secondary', icon: 'x' })}</div>`;
+    const last = store.state.delivery.slice().reverse().find((d) => d.channel === channel);
+    if (!last) return `<div class="probe-s-ch__out probe-s-ch__out--neutral">${ic('circle', 'sm')}${biInline('sin enviar', 'not sent')}</div>`;
+    const cls = outcomeClass(last.outcome);
+    const w = Core.outcomeWord(channel, last.outcome);
+    const hint = channel === 'mailto' && sLive.mailHint && last.outcome === 'opened'
+      ? `<span class="probe-s-ch__hint">${biInline('¿No se abrió nada? Puede que esta pizarra no tenga correo. Prueba Compartir o Copiar resumen.', 'Nothing opened? This board may have no mail app. Try Share or Copy summary.')}</span>` : '';
+    const next = channel === 'relay' && cls === 'err' ? `<span class="probe-s-ch__hint">${biInline('Usa Compartir, Correo o Copiar JSON.', 'Use Share, Email or Copy JSON.')}</span>` : '';
+    const after = channel === 'relay' && last.outcome === 'sent' ? `<span class="probe-s-ch__hint">${biInline('Borra el código de este dispositivo al terminar.', 'Remove the code from this device when done.')}</span>` : '';
+    return `<div class="probe-s-ch__out probe-s-ch__out--${cls}"${channel === 'relay' && cls === 'err' ? ' role="alert"' : ''}>${ic(OUT_ICON[cls], 'sm')}<span lang="es">${esc(w.es)}</span> <span class="en" lang="en">/ ${esc(w.en)}</span> <span class="probe-mono">${hhmm(last.at)}</span>${hint}${next}${after}</div>`;
+  }
+
+  function chanRow(n, key, noteHtml, controlsHtml) {
+    return `<li class="probe-s-ch"><span class="probe-s-ch__n" aria-hidden="true">${n}</span>
+      <div><div class="probe-s-ch__name">${bi(BILINGUAL.channels[key].es, BILINGUAL.channels[key].en)}</div>${noteHtml}</div>
+      <div class="probe-s-ch__btn">${controlsHtml}</div>${outcomeLine(key)}</li>`;
+  }
+
+  function foldHtml(key, open, titleEs, titleEn, stat, bodyHtml) {
+    return `<div class="probe-s__fold"><button type="button" class="probe-s__foldhead" data-act="s-fold" data-key="${key}" aria-expanded="${open}">${ic(open ? 'chevron-down' : 'chevron-right', 'md')}${biInline(titleEs, titleEn)}<span class="stat">${stat}</span></button>${open ? `<div class="probe-s__foldbody">${bodyHtml}</div>` : ''}</div>`;
+  }
+
+  function settingsBodyHtml(st) {
+    let host = '';
+    try { host = st.relayUrl ? new URL(st.relayUrl).host : ''; } catch (_) { host = ''; }
+    return `<div class="probe-s__masked">${biInline('Destinatario', 'Recipient')}: ${st.recipient ? `<span class="probe-mono">${esc(st.recipient)}</span>${btn('s-edit-to', 'Cambiar', 'Change', { variant: 'ghost' })}` : biInline('sin guardar (campo en «Correo con resumen»)', 'not saved (field under “Email summary”)')}</div>
+      <div class="probe-s__set">${field(['Servidor del relay', 'Relay host'], host ? `${host} · guardado / saved` : '', '<input class="ds-input" type="url" id="s-set-url" inputmode="url" placeholder="https://relay.example.com/…" autocomplete="off" autocapitalize="off" spellcheck="false">')}</div>
+      <div class="probe-s__set">${field(['Código de visita', 'Visit code'], st.visitCode ? `${Core.maskCode(st.visitCode)} · guardado / saved` : '', '<input class="ds-input" type="password" id="s-set-code" autocomplete="off" autocapitalize="off" spellcheck="false">')}
+        <button type="button" class="ds-btn ds-btn--secondary probe-s__eyebtn" data-act="s-show-code" aria-pressed="false">${ic('eye', 'md')}${biInline('Mostrar', 'Show')}</button></div>
+      ${sLive.setErr ? `<p class="probe-s__err" role="alert">${esc(sLive.setErr)}</p>` : ''}
+      <div class="probe-row">${btn('s-save-relay', 'Guardar servidor y código', 'Save host and code', { variant: 'secondary', icon: 'save' })}</div>
+      <div class="probe-s__forget">${btn('s-forget', 'Olvidar ajustes de envío', 'Forget send settings', { variant: 'secondary', icon: 'trash-2' })}<span class="note">${biInline('Se borran de este dispositivo.', 'Removed from this device.')}</span></div>`;
+  }
+
+  function sendHtml() {
+    const st = settings.load();
+    const channels = currentChannels();
+    const ctx = sendContext();
+    const rs = store.runState();
+    const RS = { empty: ['VACÍO', 'EMPTY'], partial: ['PARCIAL', 'PARTIAL'], finished: ['COMPLETO', 'FINISHED'] }[rs];
+    const stats = Core.notesStats(ctx.x);
+    const out = outCount();
+    const exported = out > 0 && sc('G').payload && sc('G').payload.exports && sc('G').payload.exports.length > 0;
+    const noneTerminal = Object.keys(store.state.scenarios).every((id) => !isTerminalStatus(sc(id).status));
+    const chars = ctx.summary.length;
+
+    const shareRow = channels.includes('share')
+      ? chanRow(1, 'share', `<p class="probe-s-ch__note"><span lang="es">JSON completo como <span class="probe-mono">${esc(Core.exportFilename(new Date(), 'json') + '.txt')}</span> → Gmail, Drive, Bluetooth… Quítale «.txt» al guardarlo.</span><span class="en" lang="en">Full JSON as .json.txt (plain text). Drop “.txt” when saving.</span></p>`, btn('s-share', 'Compartir archivo', 'Share file', { icon: 'upload', disabled: sLive.sharing }))
+      : '';
+    const mailControls = st.recipient && !sLive.editTo
+      ? `<div class="probe-s-ch__saved">${biInline('Para', 'To')}: <span class="probe-mono">${esc(st.recipient)}</span> · ${biInline('guardado en este dispositivo', 'saved on this device')} ${btn('s-edit-to', 'Cambiar', 'Change', { variant: 'ghost' })}</div>`
+      : `<div class="probe-s-ch__fields">${field(['Para', 'To'], '', `<input class="ds-input" type="email" id="s-to" inputmode="email" autocapitalize="off" autocomplete="email" spellcheck="false" placeholder="you@example.com" value="${esc(st.recipient)}"${sLive.mailError ? ' aria-invalid="true" aria-describedby="s-mail-err"' : ''}>`)}${btn('s-save-to', 'Guardar', 'Save', { variant: 'secondary' })}</div>`;
+    const mailRow = chanRow(2, 'mailto', `<p class="probe-s-ch__note"><span lang="es">Sin adjunto: solo el resumen. El JSON completo queda en Descargas.</span><span class="en" lang="en">No attachment: summary only. The full JSON stays in Downloads.</span></p>${mailControls}${sLive.mailError ? `<p class="probe-s__err" id="s-mail-err" role="alert">${esc(sLive.mailError)}</p>` : ''}`, btn('s-mail', 'Abrir correo', 'Open mail', { icon: 'link' }));
+    let relayHost = '';
+    try { relayHost = st.relayUrl ? new URL(st.relayUrl).host : ''; } catch (_) { relayHost = ''; }
+    const relayRow = channels.includes('relay')
+      ? chanRow(3, 'relay', `<p class="probe-s-ch__note"><span lang="es">Servidor: <span class="probe-mono">${esc(relayHost)}</span> · código guardado ${Core.maskCode(st.visitCode)}. Reenvía a tu correo; pide confirmar antes.</span><span class="en" lang="en">Forwards to your email. Asks you to confirm first.</span></p>`, btn('s-relay', 'Enviar al relay', 'Send to relay', { icon: 'upload', disabled: Boolean(sLive.relay) }))
+      : '';
+
+    const notOffered = [];
+    if (!channels.includes('share')) notOffered.push(biInline('Compartir archivo', 'Share file'));
+    if (!channels.includes('relay')) notOffered.push(biInline('Relay (sin configurar)', 'Relay (not configured)'));
+    const deliveries = store.state.delivery.map((d, i) => {
+      const w = Core.outcomeWord(d.channel, d.outcome);
+      const cls = outcomeClass(d.outcome);
+      return `<li class="probe-s__dl-row"><time datetime="${esc(d.at)}">${hhmm(d.at)}</time><span>${bi(BILINGUAL.channels[d.channel].es, BILINGUAL.channels[d.channel].en)}</span><span>${ic(OUT_ICON[cls], 'sm')}${biInline(esc(w.es), esc(w.en))}</span>${check('arr' + i, d.confirmed === true, false, 'Llegó a mi bandeja', 'Arrived in my inbox', `data-chg="s-arrived" data-i="${i}"`)}</li>`;
+    }).join('');
+
+    return `<h3 class="probe-s__title" id="send-title" tabindex="-1">② ${biInline('Enviar resultados', 'Send results')} <span class="ds-chip probe-chip">${biInline('salida', 'out')} <strong class="probe-count">${out}/2</strong></span></h3>
+      <div class="probe-s">
+        <div class="probe-s__runline"><span lang="es">Se envía el estado actual: <b>${RS[0]}</b> · A–E ${REQUIRED.filter(reqDone).length}/5 · evidence.complete: ${ctx.x.evidence.complete ? 'sí' : 'no'}</span><span class="en" lang="en">This sends the current state: <b>${RS[1]}</b> · A–E ${REQUIRED.filter(reqDone).length}/5 · evidence.complete: ${ctx.x.evidence.complete ? 'yes' : 'no'}</span></div>
+        ${noneTerminal && !sLive.testDismissed ? `<div class="probe-s__test"><div class="txt"><span lang="es">¿Sin tarjeta? Prueba el envío ahora (30 s): enviará un resumen vacío.</span><span class="en" lang="en">No flash card? Test the send path now (30 s): it sends an empty summary.</span></div>${btn('s-test', 'Probar envío', 'Test send', { icon: 'upload' })}${btn('s-test-dismiss', 'Ocultar', 'Dismiss', { variant: 'ghost' })}</div>` : ''}
+        ${!exported ? `<div class="probe-s__hint"><div class="txt"><span lang="es">Aún no exportaste: Descargas es tu copia de seguridad.</span><span class="en" lang="en">You have not exported yet: Downloads is your backup.</span></div>${btn('g-export', 'Exportar primero', 'Export first', { variant: 'secondary', icon: 'download' })}</div>` : ''}
+        <ul class="probe-s__chans" role="list">${shareRow}${mailRow}${relayRow}</ul>
+        <div class="probe-s__warn"><span lang="es">Las notas se envían tal cual. No escribas nombres de alumnos.</span><span class="en" lang="en">Notes are sent as typed. No student names.</span><span class="probe-mono">(${stats.count} · ${stats.chars})</span></div>
+        <div class="probe-s__sumhead"><h4 class="probe-s__lbl">${biInline('Resumen', 'Summary')}</h4><span class="probe-s__count${chars > 1500 ? ' probe-s__count--over' : ''}">${chars} / 1500</span>
+          <span class="grow"></span>${btn('s-copy-short', 'Copiar corto', 'Copy short', { variant: 'secondary', icon: 'clipboard-list' })}${btn('s-sum-toggle', sLive.sumOpen ? 'Contraer' : 'Expandir', sLive.sumOpen ? 'Collapse' : 'Expand', { variant: 'ghost' })}${btn('s-big', 'Ver grande', 'Show large', { variant: 'ghost', icon: 'maximize' })}</div>
+        <pre class="probe-s__pre${sLive.sumOpen ? ' probe-s__pre--full' : ''}" tabindex="0">${esc(ctx.summary)}</pre>
+        ${chars > 1500 ? `<p class="probe-note">${biInline('…truncado; JSON completo en Descargas', '…truncated; full JSON in Downloads')}</p>` : ''}
+        <div role="status" class="probe-s__status">${sLive.status ? biInline(esc(sLive.status.es), esc(sLive.status.en)) : ''}</div>
+        <h4 class="probe-s__lbl">${biInline('Siempre disponible', 'Always available')}</h4>
+        <div class="probe-s__fallbacks">${btn('g-export', 'Exportar JSON', 'Export JSON', { icon: 'download' })}${btn('g-copy-json', 'Copiar JSON', 'Copy JSON', { variant: 'secondary', icon: 'clipboard-list' })}${btn('s-copy-short', 'Copiar registro corto', 'Copy short log', { variant: 'secondary', icon: 'clipboard-list' })}${btn('g-copy-log', 'Copiar registro', 'Copy log', { variant: 'secondary', icon: 'clipboard-list' })}</div>
+        <h4 class="probe-s__lbl">${biInline('Envíos', 'Sends')}</h4>
+        ${deliveries ? `<ul class="probe-s__dl" role="list">${deliveries}</ul>` : `<p class="probe-s__dl-empty">${biInline('sin envíos todavía', 'no sends yet')}</p>`}
+        ${foldHtml('settingsOpen', sLive.settingsOpen, 'Ajustes de envío', 'Send settings', `${biInline('destinatario', 'recipient')} ${st.recipient ? '✓' : '✗'} · relay ${st.relayUrl && st.visitCode ? '✓' : '✗'}`, settingsBodyHtml(st))}
+        ${foldHtml('notOfferedOpen', sLive.notOfferedOpen, 'Canales no disponibles aquí', 'Channels not offered here', '', notOffered.length ? notOffered.map((x) => `<p>${x}</p>`).join('') : `<p>${biInline('ninguno', 'none')}</p>`)}
+      </div>`;
+  }
+
+  // polite outcome text: shown once, then cleared (the row keeps the outcome line)
+  function flashStatus(w) {
+    sLive.status = w;
+    setTimeout(() => { sLive.status = null; const n = document.querySelector('.probe-s__status'); if (n) n.textContent = ''; }, 6000);
+  }
+
+  // one result per attempt: stored in delivery[], logged (never the code, never the URL path), shown on the row
+  function sendResult(channel, outcome) {
+    store.addDelivery({ channel, outcome });
+    const w = Core.outcomeWord(channel, outcome);
+    const ch = BILINGUAL.channels[channel];
+    if (outcome !== 'cancelled') say(`${ch.es}: ${w.es}`, `${ch.en}: ${w.en}`, /^(error|failed)/.test(outcome) ? 'warn' : 'info');
+    flashStatus(w);
+    refresh();
+    renderSendIfActive();
+  }
+
+  acts['s-fold'] = (t) => { sLive[t.dataset.key] = !sLive[t.dataset.key]; renderPane(true); };
+  acts['s-sum-toggle'] = () => { sLive.sumOpen = !sLive.sumOpen; renderPane(true); };
+  acts['s-edit-to'] = () => { sLive.editTo = true; sLive.mailError = ''; renderPane(true); const f = document.getElementById('s-to'); if (f) f.focus(); };
+  acts['s-test-dismiss'] = () => { sLive.testDismissed = true; renderPane(true); };
+  acts['s-show-code'] = (t) => {
+    const input = document.getElementById('s-set-code');
+    if (!input) return;
+    const show = input.type === 'password';
+    input.type = show ? 'text' : 'password';
+    t.setAttribute('aria-pressed', String(show));
+  };
+
+  acts['s-save-to'] = () => {
+    const f = document.getElementById('s-to');
+    const v = f ? f.value.trim() : '';
+    try { settings.save({ recipient: v }); sLive.mailError = ''; sLive.editTo = false; say('Destinatario guardado en este dispositivo', 'Recipient saved on this device'); }
+    catch (e) { sLive.mailError = 'Escribe una dirección válida / Write a valid address'; }
+    renderPane(true);
+    const b = el.pane.querySelector('[data-act="s-mail"]');
+    if (b && !sLive.mailError) b.focus();
+  };
+
+  acts['s-save-relay'] = () => {
+    const url = (document.getElementById('s-set-url').value || '').trim();
+    const code = (document.getElementById('s-set-code').value || '').trim();
+    const patch = {};
+    if (url) patch.relayUrl = url;
+    if (code) patch.visitCode = code;
+    if (!Object.keys(patch).length) { sLive.setErr = 'Escribe el servidor y el código / Type the host and the code'; renderPane(true); return; }
+    try { settings.save(patch); sLive.setErr = ''; say('Ajustes de envío guardados (servidor y código)', 'Send settings saved (host and code)'); }
+    catch (e) { sLive.setErr = 'No se pudo guardar / Could not save: ' + e.message; }
+    refresh();
+    renderPane(true);
+  };
+
+  acts['s-forget'] = () => {
+    const body = `<p>${biInline('Se borran de este dispositivo: destinatario, servidor y código.', 'Removed from this device: recipient, host and code.')}</p>`;
+    const foot = `${btn('modal-close', 'Cancelar', 'Cancel', { variant: 'ghost' })}${btn('s-forget-confirm', 'Olvidar', 'Forget', { variant: 'danger' })}`;
+    openModal(dialogShell('Olvidar ajustes de envío', 'Forget send settings', body, foot), { focus: '[data-act="modal-close"].ds-btn' });
+  };
+  acts['s-forget-confirm'] = () => {
+    closeModal(true);
+    settings.forget();
+    sLive.setErr = ''; sLive.editTo = false; sLive.mailError = '';
+    say('Ajustes de envío olvidados', 'Send settings forgotten');
+    refresh();
+    renderSendIfActive();
+  };
+
+  acts['s-share'] = async () => {
+    if (sLive.sharing) return;
+    const c = sendContext();
+    const f = Core.buildShareFile(c.json, new Date());
+    let file = null;
+    try { file = new File([f.content], f.name, { type: f.type }); } catch (_) { file = null; }
+    if (!file || !navigator.canShare || !navigator.canShare({ files: [file] })) { sendResult('share', 'error: NotSupportedError'); return; }
+    sLive.sharing = true;
+    renderSendIfActive();
+    const outcome = await Core.runShare(navigator, { file, text: c.summary, title: subjectOf(c) });
+    sLive.sharing = false;
+    sendResult('share', outcome);
+  };
+
+  acts['s-mail'] = () => {
+    const field = document.getElementById('s-to');
+    const to = field ? field.value.trim() : settings.load().recipient;
+    const c = sendContext();
+    const m = Core.buildMailto({ to, summary: c.summary, classification: c.x.hostClassification, date: c.date, complete: c.x.evidence.complete });
+    if (m.error) {
+      sLive.mailError = 'Escribe una dirección válida / Write a valid address';
+      renderPane(true);
+      const f = document.getElementById('s-to');
+      if (f) f.focus();
+      return;
+    }
+    if (to !== settings.load().recipient) { try { settings.save({ recipient: to }); } catch (_) { /* send anyway */ } }
+    sLive.mailError = ''; sLive.editTo = false; sLive.mailHint = false; sLive.mailSeen = false;
+    const a = document.createElement('a');
+    a.href = m.url;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    sendResult('mailto', 'opened');
+    setTimeout(() => { if (!sLive.mailSeen) { sLive.mailHint = true; renderSendIfActive(); } }, 2200);
+  };
+
+  acts['s-relay'] = () => {
+    const st = settings.load();
+    if (!st.relayUrl || !st.visitCode) return;
+    const c = sendContext();
+    const payload = Core.compactRelayPayload(c.x);
+    let d;
+    try { d = Core.describeRelayConfirm({ relayUrl: st.relayUrl, visitCode: st.visitCode, payload }); }
+    catch (_) { say('No se pudo preparar el envío al relay', 'Could not prepare the relay send', 'warn'); return; }
+    sLive.pendingPayload = payload;
+    const prev = store.state.delivery.filter((x) => x.channel === 'relay' && x.outcome === 'sent').pop();
+    const kb = (d.bytes / 1024).toFixed(1);
+    const stats = Core.notesStats(c.x);
+    const body = `<dl class="probe-s__kv"><dt>${biInline('Servidor', 'Host')}</dt><dd>${esc(d.host)}</dd><dt>${biInline('Tamaño', 'Size')}</dt><dd>${kb} KB · ${biInline('compacto: sin cronologías', 'compact: no timelines')}</dd>
+        <dt>${biInline('Contiene', 'Contains')}</dt><dd>${biInline(`huella, estados A–H, veredictos, notas (${stats.count})`, `fingerprint, A–H statuses, verdicts, notes (${stats.count})`)}</dd></dl>
+      <p id="p9-contents">${biInline('Las notas van tal cual. No escribas nombres de alumnos.', 'Notes go as typed. No student names.')}</p>
+      <details class="probe-s__details"><summary>${biInline('Ver contenido', 'View payload')}</summary><pre class="probe-dump" tabindex="0">${esc(d.preview)}</pre></details>
+      ${prev ? `<p>${biInline(`Ya enviado a las ${hhmm(prev.at)}`, `Already sent at ${hhmm(prev.at)}`)}</p>` : ''}`;
+    const foot = `${btn('modal-close', 'Cancelar', 'Cancel', { variant: 'ghost' })}${btn('s-relay-confirm', `Enviar · ${kb} KB`, `Send · ${kb} KB`)}`;
+    openModal(dialogShell('¿Enviar al relay?', 'Send to relay?', body, foot), { focus: '[data-act="modal-close"].ds-btn' });
+    const dlg = el.modal.querySelector('.ds-dialog');
+    if (dlg) dlg.setAttribute('aria-describedby', 'p9-contents');
+  };
+
+  acts['s-relay-confirm'] = async () => {
+    closeModal(true);
+    const st = settings.load();
+    const payload = sLive.pendingPayload;
+    sLive.pendingPayload = null;
+    if (!st.relayUrl || !st.visitCode || !payload) return;
+    const ctrl = new AbortController();
+    sLive.relay = { ctrl, t0: Date.now() };
+    sLive.relayTimer = setInterval(() => setText('s-relay-count', `${Math.min(15, Math.floor((Date.now() - sLive.relay.t0) / 1000))}/15 s`), 500);
+    renderSendIfActive();
+    const outcome = await Core.sendRelay({ fetchImpl: (u, i) => fetch(u, i), relayUrl: st.relayUrl, visitCode: st.visitCode, payload, signal: ctrl.signal });
+    clearInterval(sLive.relayTimer);
+    sLive.relay = null;
+    sendResult('relay', outcome);
+  };
+  acts['s-relay-cancel'] = () => { if (sLive.relay) sLive.relay.ctrl.abort(); };
+
+  // channel-free test: the first channel that needs no typing, else the mail field
+  acts['s-test'] = () => {
+    const chans = currentChannels();
+    if (chans.includes('share')) { acts['s-share'](); return; }
+    if (chans.includes('relay')) { acts['s-relay'](); return; }
+    if (settings.load().recipient) { acts['s-mail'](); return; }
+    sLive.mailError = 'Escribe una dirección para la prueba / Type an address for the test';
+    renderPane(true);
+    const f = document.getElementById('s-to');
+    if (f) f.focus();
+  };
+
+  acts['s-arrived'] = (t) => { store.confirmDelivery(Number(t.dataset.i), t.checked); say(t.checked ? 'Envío marcado como llegado' : 'Marca de llegada quitada', t.checked ? 'Send marked as arrived' : 'Arrived tick removed'); };
+
+  acts['s-copy-short'] = async () => {
+    const ok = await copyText(Core.buildSummary(store.exportPayload()));
+    flashStatus(ok ? { es: 'copiado', en: 'copied' } : { es: 'No se pudo copiar: selecciona el texto del resumen', en: 'Could not copy: select the summary text' });
+    if (!ok) sLive.sumOpen = true;
+    say(ok ? 'Resumen copiado' : 'No se pudo copiar el resumen', ok ? 'Summary copied' : 'Could not copy the summary', ok ? 'info' : 'warn');
+    renderSendIfActive();
+  };
+
+  // P10: summary in large type for photographing the glass. A fallback, not a channel: no outcome is recorded.
+  acts['s-big'] = () => {
+    const body = `<pre class="probe-s__big" tabindex="0">${esc(Core.buildSummary(store.exportPayload()))}</pre>`;
+    const foot = btn('modal-close', 'Cerrar', 'Close', { variant: 'secondary' });
+    openModal(dialogShell('Resumen', 'Summary', body, foot), { sheet: true, focus: '[data-act="modal-close"].ds-btn' });
+  };
+
+  /* ---- send settings imported from a private link's #fragment (OQ12): saves, cleans the address bar, sends nothing */
+
+  let importedHost = null;
+
+  function importSendSettings() {
+    const imp = Core.importFragment(window.location.hash, window.location.href);
+    if (!imp) return;
+    try { window.history.replaceState(null, '', imp.cleanedUrl); } catch (_) { /* ignore */ }
+    try {
+      settings.save({ relayUrl: imp.relayUrl, visitCode: imp.visitCode });
+      importedHost = new URL(imp.relayUrl).host;
+      store.log(L('Ajustes de envío importados (servidor ' + importedHost + ')', 'Send settings imported (host ' + importedHost + ')'));
+    } catch (_) {
+      store.log(L('No se pudieron guardar los ajustes de envío importados', 'Imported send settings could not be saved'), 'warn');
+    }
+  }
+
+  function renderImportBanner() {
+    if (!importedHost) { el.importBanner.hidden = true; el.importBanner.innerHTML = ''; return; }
+    el.importBanner.hidden = false;
+    el.importBanner.innerHTML = `<div class="ds-banner" role="status">${ic('info', 'lg')}<div class="ds-banner__text"><span lang="es">Ajustes de envío importados · servidor ${esc(importedHost)} · código ••••• · la dirección se limpió</span><span class="ds-banner__en" lang="en">Send settings imported · host ${esc(importedHost)} · code ••••• · the address bar was cleaned</span></div><div class="probe-banner-actions">${btn('import-ok', 'Entendido', 'Understood', { variant: 'secondary' })}</div></div>`;
+  }
+  acts['import-ok'] = () => { importedHost = null; renderImportBanner(); };
 
   /* ------------------------------------------------------------------ should-have: iframe and file:// repeats of A–B */
 
@@ -1826,13 +2773,17 @@
     dLive.active = null; dLive.measuring = null; dLive.naOpen = {};
     bLive.busy = false; bLive.initBusy = false;
     gShowJson = false;
+    hLive.h6Na = false;
+    Object.assign(sLive, { status: null, mailHint: false, mailError: '', sumOpen: false, settingsOpen: false, notOfferedOpen: false, testDismissed: false, setErr: '', editTo: false });
   }
 
   function onKeydown(e) {
     if (e.key === 'Escape') {
+      if (hLive.open) { e.preventDefault(); if (hLive.running) hStop(); else hClose(); return; }
       if (modalState) { e.preventDefault(); closeModal(); return; }
       if (cap.active) { e.preventDefault(); finishCapture('esc'); return; }
     }
+    if (e.key === 'Enter' && e.target && e.target.id === 's-to') { e.preventDefault(); acts['s-save-to'](); return; }
     if (e.key === 'Tab' && modalState) {
       const nodes = Array.from(el.modal.querySelectorAll('button:not([disabled]), input, textarea'));
       if (!nodes.length) return;
@@ -1848,6 +2799,11 @@
     if (ls) store.storage = ls;
     collectBasicFingerprint();
     store.log(L('Visita iniciada', 'Visit started'));
+    pendingShare = readShareList();
+    takeShareFromUrl();
+    importSendSettings();
+    store.log(Core.channelsLine(currentChannels())); // first paint: channels offered (AC27, OQ10)
+    claimWriter();
 
     document.addEventListener('click', (e) => {
       const t = e.target.closest('[data-act]');
@@ -1858,9 +2814,12 @@
       if (t && acts[t.dataset.chg]) acts[t.dataset.chg](t, e);
     };
     document.addEventListener('change', onChange);
-    document.addEventListener('input', (e) => { if (e.target.type === 'text') onChange(e); });
+    document.addEventListener('input', (e) => { if (e.target.type === 'text' || e.target.tagName === 'TEXTAREA') onChange(e); });
     document.addEventListener('keydown', onKeydown);
-    document.addEventListener('visibilitychange', () => recordVisibility('visibilitychange'));
+    document.addEventListener('visibilitychange', () => { sLive.mailSeen = true; recordVisibility('visibilitychange'); });
+    window.addEventListener('blur', () => { sLive.mailSeen = true; });
+    window.addEventListener('storage', (e) => { if (e.key === WRITER_KEY && e.newValue && e.newValue !== windowId) { writerLost = true; store.storage = null; renderWriterBanner(); } });
+    window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); hLive.install = e; if (activeId === 'H' && !hLive.open) renderPane(true); });
 
     el.export.addEventListener('click', exportClicked);
     el.copyLog.addEventListener('click', copyLogAction);
@@ -1868,6 +2827,8 @@
 
     setInterval(tickClock, 1000);
     renderBanner();
+    renderShareBanner();
+    renderImportBanner();
     refresh();
     renderLog();
     selectScenario('A');

@@ -15,3 +15,7 @@ Thumbs.db
 .env
 .env.*
 *.log
+
+# Relay Worker: real values live in the dashboard or in these local files (AC25)
+.dev.vars
+worker/wrangler.local.*

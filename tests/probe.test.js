@@ -189,15 +189,16 @@ describe('smart-board-probe Test Suite', () => {
   it('AC9: Bilingual dictionary covers all operator scripts and cards', () => {
     assert.ok(BILINGUAL.title.es);
     assert.ok(BILINGUAL.title.en);
-    assert.equal(BILINGUAL.steps.length, 8);
+    assert.equal(BILINGUAL.steps.length, 10); // spec v0.4: 1, 1b, 2..9 (H = 7, F = 8, export + send = 9)
     for (const step of BILINGUAL.steps) {
       assert.ok(step.num);
       assert.ok(step.es.length > 5);
       assert.ok(step.en.length > 5);
     }
     // Verify Step 2 does NOT say "dismiss overlay"
-    assert.ok(!BILINGUAL.steps[1].es.includes('apagar overlay'));
-    assert.ok(!BILINGUAL.steps[1].en.includes('dismiss overlay'));
+    const step2 = BILINGUAL.steps.find((s) => s.num === 2);
+    assert.ok(!step2.es.includes('apagar overlay'));
+    assert.ok(!step2.en.includes('dismiss overlay'));
   });
 
   // AC10: Zero backend / static site

@@ -8,6 +8,16 @@
   "display": "standalone",
   "background_color": "#F6F4EF",
   "theme_color": "#2F5C93",
+  "share_target": {
+    "action": "./share-target",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        { "name": "file", "accept": ["image/*", "application/pdf"] }
+      ]
+    }
+  },
   "related_applications": [
     {
       "platform": "play",

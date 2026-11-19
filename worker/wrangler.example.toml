@@ -1,0 +1,20 @@
+# worker/wrangler.example.toml — template for the probe relay Worker. Copy it to worker/wrangler.local.toml
+# (git-ignored) and deploy from that copy. Nothing in this file is a real value.
+#
+# Deployment values are NOT set here. Set them in the Cloudflare dashboard
+# (Workers & Pages -> your Worker -> Settings -> Variables and Secrets) so they never reach a tracked file:
+#
+#   VISIT_CODE      secret   the long random code typed on the board (or the key that signs expiring tokens)
+#   ALLOWED_ORIGIN  text     exactly the probe's origin, scheme + host, no path, no trailing slash
+#   RELAY_TO        text     the one verified Email Routing destination that receives the results
+#   RELAY_FROM      text     a sender address on your own Email Routing domain
+#   MAX_BYTES       text     optional body cap in bytes (default 102400)
+
+name = "probe-relay"
+main = "index.mjs"
+compatibility_date = "2025-11-01"
+
+# Mail binding: the code reads it as env.EMAIL. Without a pinned destination it can only reach
+# verified Email Routing destinations of your account, so the recipient stays fixed by configuration.
+[[send_email]]
+name = "EMAIL"
