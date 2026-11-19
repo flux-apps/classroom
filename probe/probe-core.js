@@ -691,7 +691,8 @@
         signals: (of.signals || []).map((s) => ({ tapAt: s.tapAt, count: s.events.length, kinds: Array.from(new Set(s.events.map((ev) => ev.kind))) }))
       };
     }
-    out.delivery = (Array.isArray(p.delivery) ? p.delivery : []).map((d) => ({ channel: d.channel, at: d.at, outcome: d.outcome, runState: d.runState, confirmed: d.confirmed === true ? true : undefined }));
+    // The Worker whitelist caps delivery[] at 50 (worker/relay-core.mjs); keep the newest, or the 51st send would be a 400.
+    out.delivery = (Array.isArray(p.delivery) ? p.delivery : []).slice(-50).map((d) => ({ channel: d.channel, at: d.at, outcome: d.outcome, runState: d.runState, confirmed: d.confirmed === true ? true : undefined }));
     out.summary = clip(buildSummary(p), 7900);
     return out;
   }

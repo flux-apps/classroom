@@ -128,6 +128,19 @@ describe('Worker — size and shape (AC26)', () => {
     const { res } = await run(req());
     assert.equal(res.status, 200);
   });
+  it('more than 50 delivery records are trimmed to the newest 50 in the relay payload, which the Worker accepts (delivery cap)', async () => {
+    const s = new core.ProbeStore({ getItem: () => null, setItem() {}, removeItem() {} });
+    s.state.host.classification = 'gx-android';
+    s.setScenarioResult('A', 'pass', { ua: 'x' }, 'ok');
+    for (let i = 0; i < 60; i++) s.addDelivery({ channel: 'relay', outcome: `failed: try ${i}` });
+    const payload = core.compactRelayPayload(s.exportPayload());
+    assert.equal(payload.delivery.length, 50);
+    assert.deepEqual(payload.delivery.map((d) => d.outcome), Array.from({ length: 50 }, (_, k) => `failed: try ${k + 10}`));
+    const { res, d } = await run(req({ body: payload }));
+    assert.equal(res.status, 200);
+    assert.equal(d.sent.length, 1);
+    assert.equal(s.exportPayload().delivery.length, 60, 'only the relay payload is trimmed; the local export keeps every record');
+  });
 });
 
 describe('Worker — outbound mail (AC26)', () => {
