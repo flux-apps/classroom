@@ -10,18 +10,19 @@
 </head>
 <body class="probe">
 
-  <!-- P0 Shell: title tag, host / clock / evidence chips, Export / Copy / Reset -->
+  <!-- P0 Shell: title tag + subtitle on the stripe, then ONE row: host / secure / clock / evidence chips and Export / Reset / Send.
+       Copy log lives with the live log (P4). -->
   <header class="probe-head">
     <div class="ds-titlebar acc-teal">
       <h1 class="ds-titletag">Sonda SMART Board GX</h1>
-    </div>
-    <div class="probe-head__row">
       <p class="probe-head__sub">
-        <span class="ds-bi">
+        <span class="ds-bi ds-bi--inline ds-bi--on-dark">
           <span class="ds-bi__es" lang="es">Instrumento de campo</span>
           <span class="ds-bi__en" lang="en">Field instrument</span>
         </span>
       </p>
+    </div>
+    <div class="probe-head__row">
       <div class="probe-chips" id="head-chips" role="status" aria-live="off"></div>
       <div class="probe-actions">
         <button type="button" class="ds-btn ds-btn--board" id="btn-export">
@@ -29,13 +30,6 @@
           <span class="ds-bi ds-bi--on-dark">
             <span class="ds-bi__es" lang="es">Exportar JSON</span>
             <span class="ds-bi__en" lang="en">Export JSON</span>
-          </span>
-        </button>
-        <button type="button" class="ds-btn ds-btn--board ds-btn--secondary" id="btn-copy-log">
-          <span class="ic ic-clipboard-list ic--md" aria-hidden="true"></span>
-          <span class="ds-bi">
-            <span class="ds-bi__es" lang="es">Copiar registro</span>
-            <span class="ds-bi__en" lang="en">Copy log</span>
           </span>
         </button>
         <button type="button" class="ds-btn ds-btn--board ds-btn--ghost" id="btn-reset">
@@ -64,14 +58,15 @@
   <!-- P5 Restore banner (shown when a previous visit was found in localStorage) -->
   <div id="restore-banner" hidden></div>
 
-  <!-- P1 Script rail + P2 Scenario list + P3 Work pane -->
+  <!-- P2 Scenario list + P1 Current-step guide (script opens in a dialog) + P3 Work pane.
+       DOM order = visual order: list on the left, guide over the pane on the right. -->
   <main class="probe-main">
-    <aside class="probe-rail" id="script-rail" aria-label="Guion del operador / Operator script"></aside>
     <nav class="probe-list" id="scenario-list" aria-label="Escenarios / Scenarios"></nav>
+    <aside class="probe-rail" id="script-rail" aria-label="Guion del operador / Operator script"></aside>
     <section class="probe-pane" id="work-pane" aria-label="Escenario activo / Active scenario"></section>
   </main>
 
-  <!-- P4 Live log -->
+  <!-- P4 Live log: one-line strip; opens as a drawer -->
   <footer class="probe-log" id="live-log" data-open="false"></footer>
 
   <!-- Skip sheet, completeness gate (P6) and reset confirm render here -->

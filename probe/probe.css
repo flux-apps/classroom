@@ -3,13 +3,12 @@
 
 :root {
   --probe-font-mono: ui-monospace, 'Cascadia Mono', Consolas, 'Liberation Mono', monospace;   /* raw dumps only: the DS has no mono face */
-  --probe-rail-w: 280px;
-  --probe-list-w: 248px;
-  --probe-log-h: 200px;
+  --probe-list-w: 272px;
+  --probe-log-h: 52px;   /* the closed live-log strip (head 50px + 2px rule) */
   --probe-stripe: repeating-linear-gradient(135deg, var(--color-yellow-pale) 0 8px, var(--surface-card) 8px 16px);
 }
 @media (min-width: 1600px) {
-  :root { --probe-rail-w: 320px; --probe-list-w: 280px; }
+  :root { --probe-list-w: 296px; }
 }
 
 /* ---------- icon sizes (DS Icon sets --icon-size inline; here it is a class) ---------- */
@@ -31,14 +30,15 @@ html, body { height: 100%; overflow: hidden; }
 
 /* ---------- P0 shell ---------- */
 .probe-head { background: var(--surface-page); box-shadow: var(--shadow-soft); position: relative; z-index: 2; }
-.probe-head .ds-titlebar { margin: var(--space-6) 0 0; }
+.probe-head .ds-titlebar { margin: var(--space-5) 0 0; }
 .probe-head .ds-titletag { margin: 0; font-size: var(--fs-h2); }
-.probe-head__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-5); padding: var(--space-4) var(--space-5); }
-.probe-head__sub { padding-left: var(--space-3); }
-.probe-head__sub .ds-bi__es { font-size: var(--fs-board-label); }
+.probe-head__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5); padding: var(--space-3) var(--space-5); }
+.probe-head__sub { position: absolute; right: var(--space-5); top: 0; bottom: 0; display: flex; align-items: center; color: var(--text-on-accent); }
+.probe-head__sub .ds-bi__es { font-size: var(--fs-small); font-weight: var(--fw-medium); }
+.probe-head__sub .ds-bi__en { font-size: var(--fs-small); }
 .probe-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; flex: 1 1 320px; }
 .probe-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-left: auto; }
-.probe-actions .ds-btn { padding: 0 var(--space-4); }
+.probe-actions .ds-btn { --btn-h: 48px; padding: 0 var(--space-4); }
 
 .probe-chip { height: auto; min-height: var(--hit-desktop); padding: var(--space-1) var(--space-3); cursor: default; text-align: left; }
 .probe-chip .ds-bi__es { font-size: var(--fs-small); }
@@ -57,15 +57,40 @@ html, body { height: 100%; overflow: hidden; }
 
 /* ---------- main grid ---------- */
 .probe-main {
-  flex: 1 1 0; min-height: 0; display: grid; gap: var(--space-4); padding: var(--space-4);
-  grid-template-columns: var(--probe-rail-w) var(--probe-list-w) minmax(0, 1fr);
+  flex: 1 1 0; min-height: 0; display: grid; gap: var(--space-3) var(--space-4); padding: var(--space-4);
+  grid-template-columns: var(--probe-list-w) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "list guide" "list pane";
   align-items: stretch;
 }
-.probe-rail, .probe-list, .probe-pane { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.probe-list { grid-area: list; }
+.probe-rail { grid-area: guide; }
+.probe-pane { grid-area: pane; }
+.probe-list, .probe-pane { min-height: 0; overflow: auto; overscroll-behavior: contain; }
 
-/* ---------- P1 script rail ---------- */
-.probe-rail { background: var(--surface-card); border-radius: var(--r-dock); box-shadow: var(--shadow-dock); padding: var(--space-4) var(--space-3); }
-.probe-rail__title { padding: 0 var(--space-3) var(--space-2); }
+/* ---------- P1 current-step guide: one tappable strip, text clamped; the full script is a dialog (.probe-steps below) ---------- */
+.probe-guide {
+  width: 100%; display: flex; align-items: center; gap: var(--space-4); padding: var(--space-2) var(--space-4);
+  border: 0; border-left: var(--rule-tab) solid var(--select); border-radius: var(--r-card); background: var(--select-tile);
+  color: inherit; text-align: left; cursor: pointer;
+}
+.probe-guide:hover { box-shadow: var(--shadow-card); }
+.probe-guide__num { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--r-pill); background: var(--surface-card); color: var(--action); font-weight: var(--fw-bold); box-shadow: var(--shadow-soft); }
+.probe-guide__num--done { background: var(--state-success); color: var(--text-on-accent); }
+.probe-guide__text { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.probe-guide__es, .probe-guide__en { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.probe-guide__es { font-weight: var(--fw-medium); font-size: var(--fs-body); line-height: var(--lh-body); }
+.probe-guide__en { font-size: var(--fs-small); line-height: var(--lh-small); font-style: italic; color: var(--text-muted); }
+.probe-guide__all { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); color: var(--action); font-size: var(--fs-small); font-weight: var(--fw-medium); }
+.probe-guide__all .probe-count { font-size: var(--fs-h3); }
+@media (min-width: 1280px) {
+  .probe-guide__text { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-5); align-items: start; }
+  .probe-guide__es, .probe-guide__en { -webkit-line-clamp: 3; }
+  .probe-guide__es { font-size: var(--fs-board-label); line-height: var(--lh-board-label); }
+  .probe-guide__en { font-size: var(--fs-body); line-height: var(--lh-body); }
+}
+
+/* ---------- script dialog (opened from the guide) ---------- */
 .probe-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-1); }
 .probe-step {
   display: flex; align-items: flex-start; gap: var(--space-3); width: 100%; min-height: var(--hit-min);
@@ -88,17 +113,16 @@ html, body { height: 100%; overflow: hidden; }
   .probe-step__es { font-size: var(--fs-board-label); line-height: var(--lh-board-label); }
   .probe-step__en { font-size: var(--fs-body); line-height: var(--lh-body); }
 }
-.probe-rail__current { display: none; }
 
 /* ---------- P2 scenario list ---------- */
-.probe-list { display: flex; flex-direction: column; gap: var(--space-3); padding: 0 var(--space-1) var(--space-3) 0; }
-.probe-summary { padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-3); }
-.probe-summary .ds-card__title { font-size: var(--fs-body); margin: 0; }
-.probe-summary__row { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.probe-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }
+.probe-list { display: flex; flex-direction: column; gap: var(--space-2); padding: 0 var(--space-1) var(--space-3) 0; }
+.probe-summary { padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); }
+.probe-summary__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.probe-summary__row .t-caption { margin-right: var(--space-1); }
+.probe-summary .ds-badge { padding: 0 var(--space-2); gap: var(--space-1); }
+.probe-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
 .probe-card {
-  position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-2) var(--space-2); align-items: center;
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  position: relative; padding: 0 var(--space-3);
   background: var(--surface-card); border-radius: var(--r-card); box-shadow: var(--shadow-card);
   border-left: var(--rule-tab) solid transparent;
   transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
@@ -107,10 +131,13 @@ html, body { height: 100%; overflow: hidden; }
 .probe-card[aria-current="true"] { background: var(--select-tile); border-left-color: var(--select); }
 .probe-card--hole { background-image: var(--probe-stripe); }
 .probe-card__main {
-  display: flex; flex-direction: column; gap: var(--space-2); min-height: var(--hit-min); padding: 0; border: 0; background: none; cursor: pointer;
-  text-align: left; color: inherit; border-radius: var(--r-note);
+  width: 100%; display: flex; flex-direction: column; justify-content: center; gap: var(--space-1); min-height: var(--hit-min); padding: var(--space-2) 0;
+  border: 0; background: none; cursor: pointer; text-align: left; color: inherit; border-radius: var(--r-note);
 }
 .probe-card__top { display: flex; align-items: center; gap: var(--space-3); }
+.probe-card__top .ds-bi { flex: 1 1 0; min-width: 0; }
+.probe-card__status { flex: none; width: 32px; height: 32px; padding: 0; justify-content: center; }
+.ds-badge.probe-card__status .ic { --icon-size: 20px; }
 .probe-card__letter { font-size: var(--fs-h2); line-height: 1; font-weight: var(--fw-bold); color: var(--action); min-width: 28px; }
 .probe-card__letter--word { font-size: var(--fs-small); }
 .probe-card .ds-bi__es { font-size: var(--fs-board-label); line-height: var(--lh-small); }
@@ -240,22 +267,30 @@ html, body { height: 100%; overflow: hidden; }
 .probe-zone__tall { height: 480px; background-image: var(--notebook-lines); border-radius: var(--r-note); padding: var(--space-2); }
 .probe-dvh { position: fixed; left: 0; top: 0; width: 0; height: 100dvh; visibility: hidden; pointer-events: none; }
 
-/* ---------- P4 live log ---------- */
-.probe-log { flex: none; display: flex; flex-direction: column; height: var(--probe-log-h); background: var(--surface-page); border-top: var(--rule-2) solid var(--border-strong); }
-.probe-log__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); padding: var(--space-2) var(--space-5); border-bottom: var(--rule-hair) solid var(--border-quiet); }
-.probe-log__head .ds-bi__es { font-size: var(--fs-small); font-weight: var(--fw-bold); }
-.probe-log__head .ds-bi__en { font-size: var(--fs-caption); }
-.probe-log__tools { margin-left: auto; display: flex; gap: var(--space-3); align-items: center; }
-.probe-log__body { flex: 1; min-height: 0; overflow: auto; padding: var(--space-2) var(--space-5) var(--space-3); font-size: var(--fs-small); line-height: var(--lh-small); }
-.probe-log__line { display: grid; grid-template-columns: 20px 76px minmax(0, 1fr); gap: var(--space-2); padding: 2px 0; font-variant-numeric: tabular-nums; }
+/* ---------- P4 live log: a one-line strip (newest event); open = a drawer over the bottom of the page ---------- */
+.probe-log { position: relative; flex: none; height: var(--probe-log-h); background: var(--surface-page); border-top: var(--rule-2) solid var(--border-strong); }
+.probe-log__panel { display: flex; flex-direction: column; background: var(--surface-page); }
+.probe-log__head { flex: none; display: flex; align-items: center; gap: var(--space-3); height: calc(var(--probe-log-h) - var(--rule-2)); padding: 0 var(--space-5); }
+.probe-log__title { margin: 0; flex: none; font-size: inherit; line-height: inherit; }
+.probe-log__toggle { --btn-h: var(--hit-desktop); gap: var(--space-2); padding: 0 var(--space-3); font-size: var(--fs-small); font-weight: var(--fw-bold); }
+.probe-log__last { flex: 1 1 0; min-width: 0; }
+.probe-log__last .probe-log__line { padding: 0; }
+.probe-log__last .probe-log__line span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.probe-log__tools { margin-left: auto; flex: none; display: flex; gap: var(--space-3); align-items: center; }
+.probe-log__tools .ds-switch { font-size: var(--fs-small); }
+.probe-log__copy { --btn-h: var(--hit-desktop); font-size: var(--fs-small); }
+.probe-log__body { display: none; }
+.probe-log[data-open="true"] .probe-log__panel { position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; height: min(60dvh, 520px); border-top: var(--rule-2) solid var(--border-strong); box-shadow: var(--shadow-dialog); }
+.probe-log[data-open="true"] .probe-log__head { border-bottom: var(--rule-hair) solid var(--border-quiet); }
+.probe-log[data-open="true"] .probe-log__last { display: none; }
+.probe-log[data-open="true"] .probe-log__body { display: block; flex: 1; min-height: 0; overflow: auto; padding: var(--space-2) var(--space-5) var(--space-3); font-size: var(--fs-small); line-height: var(--lh-small); }
+.probe-log__line { display: grid; grid-template-columns: 20px 76px minmax(0, 1fr); gap: var(--space-2); padding: 2px 0; font-size: var(--fs-small); line-height: var(--lh-small); font-variant-numeric: tabular-nums; }
 .probe-log__line time { color: var(--text-muted); }
 .probe-log__line--warn .ic { color: var(--state-warning); }
 .probe-log__line--error .ic { color: var(--state-error); }
 .probe-log__line .ic { --icon-size: 16px; margin-top: 2px; color: var(--text-subtle); }
-.probe-log__empty { color: var(--text-muted); }
+.probe-log__empty { color: var(--text-muted); font-size: var(--fs-small); }
 .probe-log__raw { margin: 0; font: var(--fs-caption)/var(--lh-caption) var(--probe-font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-.probe-log__tools .ds-switch { font-size: var(--fs-small); }
-.probe-log__expand { display: none; }
 
 /* ---------- modals: skip sheet, P6 gate, reset confirm ---------- */
 .probe-modal { position: fixed; inset: 0; z-index: 20; display: grid; }
@@ -272,48 +307,42 @@ html, body { height: 100%; overflow: hidden; }
 
 /* ---------- responsive ---------- */
 @media (max-height: 800px) {
-  .probe-head .ds-titlebar { margin-top: var(--space-5); }
-  .probe-head__row { padding-top: var(--space-3); padding-bottom: var(--space-3); gap: var(--space-2) var(--space-4); }
-  .probe-head__sub { display: none; }
-  .probe-chip--count { display: none; }
+  .probe-head__row { padding-top: var(--space-2); padding-bottom: var(--space-2); }
   .probe-pane__letter { font-size: var(--fs-h1); }
   .probe-pane__head .ds-bi__es { font-size: var(--fs-h3); line-height: var(--lh-h3); }
   .probe-surface--fixed { height: clamp(120px, 20vh, 200px); }
   #restore-banner .ds-banner { padding-top: var(--space-2); padding-bottom: var(--space-2); }
   .probe-zoombar { gap: var(--space-2); }
-  .probe-main { gap: var(--space-3); padding: var(--space-3); }
+  .probe-main { gap: var(--space-2) var(--space-3); padding: var(--space-3); }
   .probe-step { padding: var(--space-1) var(--space-3); }
   .probe-step__es { font-size: var(--fs-body); line-height: var(--lh-body); }
   .probe-step__en { font-size: var(--fs-small); line-height: var(--lh-small); }
+  .probe-card__main { padding: var(--space-1) 0; }
+  .probe-card .ds-bi__es { font-size: var(--fs-body); }
   .probe-pane { padding: var(--space-4); gap: var(--space-3); }
-  :root { --probe-log-h: 132px; }
-}
-@media (max-height: 760px) {
-  :root { --probe-log-h: 76px; }
-  .probe-log__expand { display: inline-flex; }
-  .probe-log[data-open="false"] .probe-log__body { overflow: hidden; }
-  .probe-log[data-open="true"] { position: fixed; left: 0; right: 0; bottom: 0; height: 60dvh; z-index: 10; box-shadow: var(--shadow-dialog); }
 }
 
 @media (max-width: 1279px) {
   .probe-main { display: flex; flex-direction: column; overflow: auto; align-items: stretch; }
-  .probe-rail, .probe-list, .probe-pane { overflow: visible; flex: none; }
-  .probe-rail { padding: var(--space-3); }
-  .probe-rail__title { display: none; }
-  .probe-steps { flex-direction: row; flex-wrap: wrap; }
-  .probe-step { width: auto; min-width: var(--hit-min); justify-content: center; padding: var(--space-2); border-left: 0; }
-  .probe-step__text { display: none; }
-  .probe-rail__current { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-3); margin-top: var(--space-2); border-radius: var(--r-card); background: var(--select-tile); }
-  .probe-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .probe-rail, .probe-pane { overflow: visible; flex: none; }
+  /* the list becomes one swipeable row (summary, cards, "if time" cards) so the guide and the pane stay on screen */
+  .probe-list { flex: none; flex-direction: row; align-items: stretch; gap: var(--space-2); padding: var(--space-1) var(--space-1) var(--space-2); overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
+  .probe-summary { flex: 0 0 248px; }
+  .probe-cards { flex: none; flex-direction: row; align-items: stretch; }
+  .probe-card { flex: 0 0 200px; }
+  .probe-list__rule { flex: none; margin: 0; align-self: center; }
+  .probe-list__rule::after { display: none; }
   .probe-pane { min-height: 520px; }
   .probe-surface { min-height: 320px; }
 }
 @media (max-width: 799px) {
-  .probe-cards { grid-template-columns: minmax(0, 1fr); }
   .probe-grid2, .probe-zones { grid-template-columns: minmax(0, 1fr); }
   .probe-kv { grid-template-columns: minmax(0, 1fr); }
   .probe-actions { margin-left: 0; }
   .probe-head .ds-titletag { left: var(--space-4); font-size: var(--fs-h3); }
+  .probe-head__sub { display: none; }
+  .probe-log__head { padding: 0 var(--space-3); }
+  .probe-log__last { display: none; }
 }
 
 /* ---------- small pieces used by the controller ---------- */
@@ -328,7 +357,6 @@ html, body { height: 100%; overflow: hidden; }
 .probe-pane .ds-tabs { margin: 0; }
 .probe-head, #restore-banner, #share-banner, #import-banner, #writer-banner { flex: none; }
 #share-banner .ds-banner, #import-banner .ds-banner, #writer-banner .ds-banner { border-bottom-color: var(--color-yellow); align-items: center; }
-.probe-chip--sep { border-style: dashed; }
 .ds-field__label .en { display: block; }
 
 /* =====================================================================
@@ -434,7 +462,7 @@ body.probe[data-surface] { display: block; background: var(--surface-card); }
 .probe-h-reason { font-size: var(--fs-caption); line-height: var(--lh-caption); color: var(--text-muted); }
 .probe-h-err { min-height: var(--lh-small); font-size: var(--fs-small); font-weight: var(--fw-bold); }
 .probe-h-dock textarea.ds-input { min-height: var(--hit-min); font-size: var(--fs-small); }
-.probe-h-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.probe-h-sr, .probe-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* =====================================================================
    G2 — Send results (UX §17): P8 panel inside the G pane, P9 confirm, P10 large summary

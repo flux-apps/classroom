@@ -37,7 +37,6 @@
     modal: document.getElementById('modal-root'),
     dvh: document.getElementById('dvh-probe'),
     export: document.getElementById('btn-export'),
-    copyLog: document.getElementById('btn-copy-log'),
     reset: document.getElementById('btn-reset'),
     send: document.getElementById('btn-send'),
     shareBanner: document.getElementById('share-banner'),
@@ -328,24 +327,17 @@
     const ev = store.state.evidence;
     const served = h.protocol === 'file:' ? 'file:' : h.protocol === 'https:' ? 'https' : 'http';
     const secure = h.isSecureContext;
-    const done = REQUIRED.filter(reqDone).length;
     const conf = confidenceWord(h.confidence);
     const secs = store.state.activeSeconds || 0;
     const clock = `${pad2(Math.floor(secs / 60))}:${pad2(secs % 60)}`;
-    const hDone = hDoneCount();
-    const out = outCount();
+    // Four chips only. The A–E, H and out counts live on the list (evidence bar, D / H / G cards), not up here.
     el.chips.innerHTML = [
       `<span class="ds-chip probe-chip probe-chip--info" aria-label="host">${ic('layout-grid', 'md')}${bi('host: ' + esc(h.classification), 'confianza ' + conf[0] + ' · confidence ' + conf[1])}</span>`,
       `<span class="ds-chip probe-chip ${secure ? 'probe-chip--ok' : 'probe-chip--warn'}">${ic(secure ? 'lock' : 'triangle-alert', 'md')}${bi(esc(served) + (secure ? ' · contexto seguro' : ' · sin contexto seguro'), esc(served) + (secure ? ' · secure context' : ' · not a secure context'))}</span>`,
       `<span class="ds-chip probe-chip">${ic('clock', 'md')}${bi('Visita', 'Visit')}<strong class="probe-count" id="visit-clock">${clock}</strong></span>`,
-      `<span class="ds-chip probe-chip probe-chip--count">${ic('clipboard-list', 'md')}${bi('A–E terminados', 'A–E finished')}<strong class="probe-count">${done}/5</strong></span>`,
       ev.complete
         ? `<span class="ds-chip probe-chip probe-chip--ok" role="status">${ic('circle-check', 'md')}${bi('Evidencia completa', 'evidence.complete: yes')}</span>`
-        : `<span class="ds-chip probe-chip probe-chip--warn" role="status">${ic('triangle-alert', 'md')}${bi('Evidencia incompleta', 'evidence.complete: no')}</span>`,
-      Core.isHComplete(store.state)
-        ? `<span class="ds-chip probe-chip probe-chip--ok probe-chip--sep">${ic('circle-check', 'md')}${bi('H completo: sí', 'H complete: yes')}</span>`
-        : `<span class="ds-chip probe-chip probe-chip--sep">${ic('hand', 'md')}${bi('H · Overlay sigue', 'H · Overlay follows')}<strong class="probe-count">${hDone}/3</strong></span>`,
-      `<span class="ds-chip probe-chip probe-chip--sep">${ic('upload', 'md')}${bi('salida', 'out')}<strong class="probe-count">${out}/2</strong></span>`
+        : `<span class="ds-chip probe-chip probe-chip--warn" role="status">${ic('triangle-alert', 'md')}${bi('Evidencia incompleta', 'evidence.complete: no')}</span>`
     ].join('');
   }
 
@@ -370,23 +362,39 @@
     return step.targets.every((id) => isTerminalStatus(sc(id).status));
   }
 
+  // The guide is one tappable strip: the first step still to do (clamped; the full numbered script opens in a dialog).
   function renderRail() {
     const steps = BILINGUAL.steps;
     const current = steps.find((s) => !stepDone(s)) || null;
-    el.rail.innerHTML = `<p class="t-caption probe-rail__title">${biInline('Guion del operador', 'Operator script')}</p>
-      <ol class="probe-steps">${steps.map((s) => {
-        const done = stepDone(s);
-        const isCur = current && current.num === s.num;
-        return `<li><button type="button" class="probe-step${done ? ' probe-step--done' : ''}"${isCur ? ' aria-current="step"' : ''} data-act="step" data-step="${s.num}" aria-label="${s.num}. ${esc(s.es)}">
+    const doneCount = steps.filter(stepDone).length;
+    const text = current
+      ? `<span class="probe-guide__num" aria-hidden="true">${current.num}</span>
+        <span class="probe-guide__text"><span class="probe-guide__es" lang="es"><span class="probe-sr">${current.num}. </span>${esc(current.es)}</span><span class="probe-guide__en" lang="en">${esc(current.en)}</span></span>`
+      : `<span class="probe-guide__num probe-guide__num--done" aria-hidden="true">${ic('check', 'md')}</span>
+        <span class="probe-guide__text"><span class="probe-guide__es" lang="es">Guion terminado.</span><span class="probe-guide__en" lang="en">Script finished.</span></span>`;
+    el.rail.innerHTML = `<button type="button" class="probe-guide" data-act="script-open" aria-haspopup="dialog">${text}
+      <span class="probe-guide__all">${ic('clipboard-list', 'md')}${biInline('Guion', 'Script')} <strong class="probe-count">${doneCount}/${steps.length}</strong></span></button>`;
+  }
+
+  function openScript() {
+    const steps = BILINGUAL.steps;
+    const current = steps.find((s) => !stepDone(s)) || null;
+    const items = steps.map((s) => {
+      const done = stepDone(s);
+      const isCur = current && current.num === s.num;
+      return `<li><button type="button" class="probe-step${done ? ' probe-step--done' : ''}"${isCur ? ' aria-current="step"' : ''} data-act="step" data-step="${s.num}" aria-label="${s.num}. ${esc(s.es)}">
           <span class="probe-step__num">${done ? ic('check', 'sm') : s.num}</span>
           <span class="probe-step__text"><span class="probe-step__es" lang="es">${esc(s.es)}</span><span class="probe-step__en" lang="en">${esc(s.en)}</span></span></button></li>`;
-      }).join('')}</ol>
-      <div class="probe-rail__current">${current ? `<span class="probe-step__es" lang="es">${current.num}. ${esc(current.es)}</span><span class="probe-step__en" lang="en">${esc(current.en)}</span>` : `<span class="probe-step__es" lang="es">Guion terminado.</span><span class="probe-step__en" lang="en">Script finished.</span>`}</div>`;
+    }).join('');
+    openModal(dialogShell('Guion del operador', 'Operator script', `<ol class="probe-steps">${items}</ol>`, btn('modal-close', 'Cerrar', 'Close', { variant: 'ghost' })), { focus: current ? '[aria-current="step"]' : null });
   }
+
+  acts['script-open'] = openScript;
 
   acts.step = (t) => {
     const step = BILINGUAL.steps.find((s) => String(s.num) === t.dataset.step);
     if (!step) return;
+    closeModal();
     if (step.num === '1b') { openSend(); return; }
     selectScenario(step.targets[0], true);
   };
@@ -402,33 +410,42 @@
     return miss.includes('trial:' + tid) || miss.includes('trial:' + tid + ':overlayOn');
   }
 
+  // List cards show status as an icon only once it is not idle (the full word is in the pane head); the per-card skip arrow is gone: Skip… is in the pane head.
+  function statusIcon(status) {
+    const ui = STATUS_UI[status] || STATUS_UI.idle;
+    const word = BILINGUAL.status[status] || BILINGUAL.status.idle;
+    const said = `<span class="probe-sr"><span lang="es">${word.es}</span> / <span lang="en">${word.en}</span></span>`;
+    if (status === 'idle' || !STATUS_UI[status]) return said;
+    return `<span class="ds-badge probe-card__status${ui.tone ? ' ds-badge--' + ui.tone : ''} probe-status--${status}">${ic(ui.icon, 'md')}${said}</span>`;
+  }
+
   function renderList() {
     const done = REQUIRED.filter(reqDone).length;
     const holes = ['D3', 'D4', 'D6'].map((tid) => {
       const hole = holeTrial(tid);
-      return `<span class="ds-badge ${hole ? 'ds-badge--warning' : 'ds-badge--success'}">${ic(hole ? 'triangle-alert' : 'circle-check', 'sm')}${tid} · Overlay ON</span>`;
+      return `<span class="ds-badge ${hole ? 'ds-badge--warning' : 'ds-badge--success'}">${ic(hole ? 'triangle-alert' : 'circle-check', 'sm')}${tid}<span class="probe-sr"> ${hole ? 'pendiente / pending' : 'completo / complete'}</span></span>`;
     }).join('');
     const card = (m) => {
       const s = sc(m.id);
       const hole = m.id === 'D' && ['D3', 'D4', 'D6'].some(holeTrial) && s.status !== 'idle';
-      const canSkip = !isTerminalStatus(s.status) || s.status === 'na';
       const letter = m.optional ? '' : `<span class="probe-card__letter">${m.id}</span>`;
-      const extra = m.id === 'D' ? `<span class="ds-badge">${trialsDone()}/6</span>` : m.id === 'H' ? `<span class="ds-badge ds-badge--info">${hDoneCount()}/3</span><span class="ds-badge ds-badge--warning">${ic('clock', 'sm')}Antes de F / Before F</span>` : '';
+      const extra = m.id === 'D' ? `<span class="ds-badge">${trialsDone()}/6</span>`
+        : m.id === 'H' ? `<span class="ds-badge ds-badge--info">${hDoneCount()}/3</span><span class="ds-badge ds-badge--warning">${ic('clock', 'sm')}Antes de F / Before F</span>`
+          : m.id === 'G' ? `<span class="ds-badge">${ic('upload', 'sm')}${biInline('salida', 'out')} ${outCount()}/2</span>` : '';
       const warn = m.warnEs ? `<span class="ds-badge ds-badge--warning">${ic('triangle-alert', 'sm')}${m.warnEs} / ${m.warnEn}</span>` : '';
+      const metaRow = extra + warn;
       return `<li class="probe-card${hole ? ' probe-card--hole' : ''}" aria-current="${m.id === activeId}">
         <button type="button" class="probe-card__main" data-act="select" data-id="${m.id}"${s.status === 'running' ? ' aria-busy="true"' : ''}>
-          <span class="probe-card__top">${letter}${bi(m.es, m.en)}</span>
-          <span class="probe-card__meta">${statusBadge(s.status)}${extra}${warn}</span>
+          <span class="probe-card__top">${letter}${bi(m.es, m.en)}${statusIcon(s.status)}</span>
+          ${metaRow ? `<span class="probe-card__meta">${metaRow}</span>` : ''}
         </button>
-        <button type="button" class="ds-iconbtn ds-iconbtn--board" data-act="skip" data-id="${m.id}" aria-label="Saltar… / Skip… ${m.id}" title="Saltar… / Skip…"${canSkip ? '' : ' disabled'}>${ic('arrow-right', 'lg')}</button>
       </li>`;
     };
     const main = BILINGUAL.scenarios.filter((m) => !m.optional && m.card !== false).map(card).join('');
     const optional = BILINGUAL.scenarios.filter((m) => m.optional && m.card !== false).map(card).join('');
     el.list.innerHTML = `<div class="ds-card ds-card--outline probe-summary">
-        <h2 class="ds-card__title">${biInline('Barra de evidencia', 'Evidence bar')}</h2>
-        <div class="ds-progress"><div class="ds-progress__track" role="progressbar" aria-valuemin="0" aria-valuemax="5" aria-valuenow="${done}" aria-label="A–E"><div class="ds-progress__fill" data-pct="${done * 20}"></div></div><span>${done}/5</span></div>
-        <div class="probe-summary__row">${holes}</div>
+        <div class="ds-progress"><span class="t-caption">A–E</span><div class="ds-progress__track" role="progressbar" aria-valuemin="0" aria-valuemax="5" aria-valuenow="${done}" aria-label="Evidencia A–E / Evidence A–E"><div class="ds-progress__fill" data-pct="${done * 20}"></div></div><span>${done}/5</span></div>
+        <div class="probe-summary__row"><span class="t-caption">Overlay ON</span>${holes}</div>
       </div>
       <ul class="probe-cards" role="list">${main}</ul>
       <p class="probe-list__rule t-caption">${biInline('Si hay tiempo', 'If time')}</p>
@@ -449,33 +466,49 @@
 
   /* ------------------------------------------------------------------ P4 live log */
 
+  function logLine(l) {
+    const d = new Date(l.ts);
+    const icon = l.level === 'error' ? 'circle-alert' : l.level === 'warn' ? 'triangle-alert' : 'info';
+    return `<div class="probe-log__line probe-log__line--${esc(l.level)}">${ic(icon, 'sm')}<time datetime="${esc(l.ts)}">${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}</time><span>${esc(l.message)}</span></div>`;
+  }
+
+  // Closed: a one-line strip with the newest event. Open: a drawer over the bottom of the page with the whole log.
   function renderLog() {
     const entries = store.state.log;
-    const lineIcon = (lvl) => (lvl === 'error' ? 'circle-alert' : lvl === 'warn' ? 'triangle-alert' : 'info');
-    let body;
-    if (!entries.length) body = `<p class="probe-log__empty">${biInline('sin eventos', 'no events')}</p>`;
-    else if (rawLog) body = `<pre class="probe-log__raw" tabindex="0">${esc(safeJson(entries, 2))}</pre>`;
-    else {
-      body = entries.map((l) => {
-        const d = new Date(l.ts);
-        return `<div class="probe-log__line probe-log__line--${esc(l.level)}">${ic(lineIcon(l.level), 'sm')}<time datetime="${esc(l.ts)}">${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}</time><span>${esc(l.message)}</span></div>`;
-      }).join('');
-    }
     const open = el.log.dataset.open === 'true';
-    el.log.innerHTML = `<div class="probe-log__head">
-        <h2 class="probe-log__title">${bi('Registro en vivo', 'Live log')}</h2>
+    const active = document.activeElement;
+    const focusKeep = active && el.log.contains(active) ? (active.dataset.act || active.dataset.chg || null) : null;
+    let body = '';
+    if (open) {
+      if (!entries.length) body = `<p class="probe-log__empty">${biInline('sin eventos', 'no events')}</p>`;
+      else if (rawLog) body = `<pre class="probe-log__raw" tabindex="0">${esc(safeJson(entries, 2))}</pre>`;
+      else body = entries.map(logLine).join('');
+    }
+    const last = entries.length ? logLine(entries[entries.length - 1]) : `<p class="probe-log__empty">${biInline('sin eventos', 'no events')}</p>`;
+    el.log.innerHTML = `<div class="probe-log__panel">
+      <div class="probe-log__head">
+        <h2 class="probe-log__title"><button type="button" class="ds-btn ds-btn--ghost probe-log__toggle" data-act="log-expand" aria-expanded="${open}" aria-controls="live-log-body">${ic(open ? 'chevron-down' : 'chevron-right', 'sm')}${biInline('Registro en vivo', 'Live log')}<span class="ds-badge">${entries.length}</span></button></h2>
+        <div class="probe-log__last">${last}</div>
         <div class="probe-log__tools">
-          <label class="ds-switch"><input type="checkbox" role="switch" data-chg="log-raw"${rawLog ? ' checked' : ''}><span class="ds-switch__track"></span><span>${biInline('Datos crudos', 'Raw')}</span></label>
-          <button type="button" class="ds-btn ds-btn--secondary ds-btn--small probe-log__expand" data-act="log-expand" aria-expanded="${open}">${ic(open ? 'chevron-down' : 'chevron-right', 'sm')}${open ? biInline('Cerrar registro', 'Close log') : biInline('Abrir registro', 'Open log')}</button>
+          ${open ? `<label class="ds-switch"><input type="checkbox" role="switch" data-chg="log-raw"${rawLog ? ' checked' : ''}><span class="ds-switch__track"></span><span>${biInline('Datos crudos', 'Raw')}</span></label>` : ''}
+          <button type="button" class="ds-btn ds-btn--secondary probe-log__copy" data-act="log-copy">${ic('clipboard-list', 'md')}${biInline('Copiar registro', 'Copy log')}</button>
         </div>
       </div>
-      <div class="probe-log__body" role="log" aria-live="off" tabindex="0">${body}</div>`;
-    const b = el.log.querySelector('.probe-log__body');
-    if (b) b.scrollTop = b.scrollHeight;
+      <div class="probe-log__body" id="live-log-body" role="log" aria-live="off" tabindex="0">${body}</div>
+    </div>`;
+    if (open) {
+      const b = el.log.querySelector('.probe-log__body');
+      if (b) b.scrollTop = b.scrollHeight;
+    }
+    if (focusKeep) {
+      const n = el.log.querySelector(`[data-act="${focusKeep}"], [data-chg="${focusKeep}"]`);
+      if (n) n.focus({ preventScroll: true });
+    }
   }
 
   acts['log-raw'] = (t) => { rawLog = t.checked; renderLog(); };
   acts['log-expand'] = () => { el.log.dataset.open = String(el.log.dataset.open !== 'true'); renderLog(); };
+  acts['log-copy'] = () => copyLogAction();
 
   /* ------------------------------------------------------------------ modals (skip sheet, P6 gate, reset) */
 
@@ -2822,7 +2855,6 @@
     window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); hLive.install = e; if (activeId === 'H' && !hLive.open) renderPane(true); });
 
     el.export.addEventListener('click', exportClicked);
-    el.copyLog.addEventListener('click', copyLogAction);
     el.reset.addEventListener('click', openReset);
 
     setInterval(tickClock, 1000);
